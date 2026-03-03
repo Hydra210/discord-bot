@@ -139,8 +139,8 @@ async def scan(ctx):
     
     output.append("\n" + "="*50)
     
-    # Write to file
-    filename = f"server_scan_{guild.id}.txt"
+    # Write to file in /tmp directory (Render writable directory)
+    filename = f"/tmp/server_scan_{guild.id}.txt"
     with open(filename, "w", encoding="utf-8") as f:
         f.write("\n".join(output))
     
@@ -156,4 +156,7 @@ async def scan(ctx):
         await ctx.send(f"⚠️ Could not find #private-bot-cmds channel. Sending here instead.", file=discord.File(filename))
     
     # Clean up
-    os.remove(filename)
+    try:
+        os.remove(filename)
+    except:
+        pass  # If file doesn't exist or can't be deleted, ignore
