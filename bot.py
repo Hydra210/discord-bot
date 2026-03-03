@@ -118,45 +118,60 @@ async def send_channel_embed(channel, channel_key=None):
 async def on_ready():
     print(f"Logged in as {bot.user}")
     print("Bot is online.")
+    await bot.tree.sync()  # sync slash commands if any
 
+# =========================
+# MEMBER JOIN
+# =========================
 # =========================
 # MEMBER JOIN
 # =========================
 @bot.event
 async def on_member_join(member):
-    # Send join notification to welcome channel
-    welcome_channel = discord.utils.get(member.guild.text_channels, name="{.Σ}-welcome")
+    guild = member.guild
+
+    # --- WELCOME CHANNEL: banner + join notification embed ---
+    welcome_channel = discord.utils.get(guild.text_channels, name="{.Σ}-welcome")
     if welcome_channel:
+        await send_banner(welcome_channel)
         embed = discord.Embed(
             title=f"👋 {member.name} just joined the server!",
-            description=f"Hey {member.mention}, welcome to **{member.guild.name}**! 🎉\n\nMake sure you read the rules and get verified to unlock the full server.",
+            description=(
+                f"Hey {member.mention}, welcome to **{guild.name}**! 🎉\n\n"
+                f"Make sure you read the rules and get verified to unlock the full server."
+            ),
             color=discord.Color.green()
         )
         embed.set_thumbnail(url=member.display_avatar.url)
         embed.add_field(name="📋 Rules", value="Head to <#rules> before anything else.", inline=True)
         embed.add_field(name="✅ Verification", value="Get verified to unlock all channels.", inline=True)
-        embed.set_footer(text=f"Member #{member.guild.member_count}", icon_url=member.guild.icon.url if member.guild.icon else None)
+        embed.set_footer(
+            text=f"Member #{guild.member_count}",
+            icon_url=guild.icon.url if guild.icon else None
+        )
         embed.timestamp = discord.utils.utcnow()
         await welcome_channel.send(embed=embed)
         await welcome_channel.send(DIVIDER)
 
-    joins_channel = discord.utils.get(member.guild.text_channels, name="{.Σ}-joins")
+    # --- JOINS CHANNEL: banner + join log embed ---
+    joins_channel = discord.utils.get(guild.text_channels, name="{.Σ}-joins")
     if joins_channel:
         await send_banner(joins_channel)
         embed = discord.Embed(
-            title=f"🎉 Welcome to {member.guild.name}!",
+            title=f"🎉 Welcome to {guild.name}!",
             description=f"Hey {member.mention}! We're glad you're here. Make yourself at home!",
             color=discord.Color.green()
         )
         embed.set_thumbnail(url=member.display_avatar.url)
-        embed.add_field(name="👋 You're our member #", value=str(member.guild.member_count), inline=True)
+        embed.add_field(name="👋 You're our member #", value=str(guild.member_count), inline=True)
         embed.add_field(name="📅 Account Age", value=f"<t:{int(member.created_at.timestamp())}:R>", inline=True)
-        embed.set_footer(text=member.guild.name, icon_url=member.guild.icon.url if member.guild.icon else None)
+        embed.set_footer(text=guild.name, icon_url=guild.icon.url if guild.icon else None)
         embed.timestamp = discord.utils.utcnow()
         await joins_channel.send(embed=embed)
         await joins_channel.send(DIVIDER)
 
-    logs = discord.utils.get(member.guild.channels, name="{.Σ}-logs")
+    # --- LOGS CHANNEL: staff join log ---
+    logs = discord.utils.get(guild.text_channels, name="{.Σ}-logs")
     if logs:
         embed = discord.Embed(
             title="✅ Member Joined",
@@ -164,7 +179,7 @@ async def on_member_join(member):
             color=discord.Color.green()
         )
         embed.add_field(name="Account Created", value=f"<t:{int(member.created_at.timestamp())}:R>", inline=True)
-        embed.add_field(name="Member Count", value=str(member.guild.member_count), inline=True)
+        embed.add_field(name="Member Count", value=str(guild.member_count), inline=True)
         embed.set_thumbnail(url=member.display_avatar.url)
         embed.timestamp = discord.utils.utcnow()
         await logs.send(embed=embed)
@@ -174,8 +189,12 @@ async def on_member_join(member):
 # =========================
 @bot.event
 async def on_member_remove(member):
-    leaves_channel = discord.utils.get(member.guild.text_channels, name="{.Σ}-leaves")
+    guild = member.guild
+
+    # --- LEAVES CHANNEL: banner + leave embed ---
+    leaves_channel = discord.utils.get(guild.text_channels, name="{.Σ}-leaves")
     if leaves_channel:
+        await send_banner(leaves_channel)
         embed = discord.Embed(
             title="👋 A member has left",
             description=f"**{member.name}** has left the server.",
@@ -183,12 +202,14 @@ async def on_member_remove(member):
         )
         if member.joined_at:
             embed.add_field(name="Time with us", value=f"<t:{int(member.joined_at.timestamp())}:R>", inline=True)
-        embed.add_field(name="Members Remaining", value=str(member.guild.member_count), inline=True)
+        embed.add_field(name="Members Remaining", value=str(guild.member_count), inline=True)
         embed.set_thumbnail(url=member.display_avatar.url)
         embed.timestamp = discord.utils.utcnow()
         await leaves_channel.send(embed=embed)
+        await leaves_channel.send(DIVIDER)
 
-    logs = discord.utils.get(member.guild.channels, name="{.Σ}-logs")
+    # --- LOGS CHANNEL: staff leave log ---
+    logs = discord.utils.get(guild.text_channels, name="{.Σ}-logs")
     if logs:
         embed = discord.Embed(
             title="❌ Member Left",
@@ -197,7 +218,7 @@ async def on_member_remove(member):
         )
         if member.joined_at:
             embed.add_field(name="Time with us", value=f"<t:{int(member.joined_at.timestamp())}:R>", inline=True)
-        embed.add_field(name="Members Remaining", value=str(member.guild.member_count), inline=True)
+        embed.add_field(name="Members Remaining", value=str(guild.member_count), inline=True)
         embed.set_thumbnail(url=member.display_avatar.url)
         embed.timestamp = discord.utils.utcnow()
         await logs.send(embed=embed)
@@ -719,14 +740,18 @@ async def botcommands(ctx):
 @bot.command()
 @commands.is_owner()
 async def testjoin(ctx):
-    await on_member_join(ctx.author)
-    await ctx.send("✅ Simulated join event!")
+    """Simulate a member joining by firing the actual event with your own member object."""
+    await ctx.message.delete()
+    bot.dispatch("member_join", ctx.author)
+    await ctx.send("✅ Dispatched join event!", delete_after=5)
 
 @bot.command()
 @commands.is_owner()
 async def testleave(ctx):
-    await on_member_remove(ctx.author)
-    await ctx.send("✅ Simulated leave event!")
+    """Simulate a member leaving by firing the actual event with your own member object."""
+    await ctx.message.delete()
+    bot.dispatch("member_remove", ctx.author)
+    await ctx.send("✅ Dispatched leave event!", delete_after=5)
 
 # =========================
 # SHUTDOWN
