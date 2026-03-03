@@ -1109,70 +1109,74 @@ async def bb_build_one(guild, ch_name, cat_name, ow_type, roles):
             read_messages=read, send_messages=send, read_message_history=history
         )
 
-    # Build overwrite dicts per type
+    def safe_ow_dict(entries):
+        """Build an overwrite dict, silently skipping any None roles."""
+        return {role: perms for role, perms in entries if role is not None}
+
+    # Build overwrite dicts per type — None roles are automatically skipped
     overwrites = {
-        "verify": {
-            ev: ow(read=False, history=False),
-            unverified_r: ow(read=True, send=True, history=True),
-            verified_r:   ow(read=False, history=False),
-            mod_r:        ow(read=True, send=True, history=True),
-            admin_r:      ow(read=True, send=True, history=True),
-            owner_r:      ow(read=True, send=True, history=True),
-        },
-        "logs": {
-            ev:      ow(read=False, history=False),
-            mod_r:   ow(read=True, send=True, history=True),
-            admin_r: ow(read=True, send=True, history=True),
-            owner_r: ow(read=True, send=True, history=True),
-        },
-        "info": {
-            ev:         ow(read=False, send=False, history=False),
-            verified_r: ow(read=True, send=False, history=True),
-            mod_r:      ow(read=True, send=True, history=True),
-            admin_r:    ow(read=True, send=True, history=True),
-            owner_r:    ow(read=True, send=True, history=True),
-        },
-        "links": {
-            ev:         ow(read=False, send=False, history=False),
-            verified_r: ow(read=True, send=False, history=True),
-            mod_r:      ow(read=True, send=True, history=True),
-            admin_r:    ow(read=True, send=True, history=True),
-            owner_r:    ow(read=True, send=True, history=True),
-        },
-        "community": {
-            ev:         ow(read=False, history=False),
-            verified_r: ow(read=True, send=True, history=True),
-            mod_r:      ow(read=True, send=True, history=True),
-            admin_r:    ow(read=True, send=True, history=True),
-            owner_r:    ow(read=True, send=True, history=True),
-        },
-        "community_ro": {
-            ev:         ow(read=False, send=False, history=False),
-            verified_r: ow(read=True, send=False, history=True),
-            mod_r:      ow(read=True, send=True, history=True),
-            admin_r:    ow(read=True, send=True, history=True),
-            owner_r:    ow(read=True, send=True, history=True),
-        },
-        "support": {
-            ev:         ow(read=False, history=False),
-            verified_r: ow(read=True, send=True, history=True),
-            mod_r:      ow(read=True, send=True, history=True),
-            admin_r:    ow(read=True, send=True, history=True),
-            owner_r:    ow(read=True, send=True, history=True),
-        },
-        "media": {
-            ev:         ow(read=False, history=False),
-            verified_r: ow(read=True, send=True, history=True),
-            mod_r:      ow(read=True, send=True, history=True),
-            admin_r:    ow(read=True, send=True, history=True),
-            owner_r:    ow(read=True, send=True, history=True),
-        },
-        "staff": {
-            ev:      ow(read=False, history=False),
-            mod_r:   ow(read=True, send=True, history=True),
-            admin_r: ow(read=True, send=True, history=True),
-            owner_r: ow(read=True, send=True, history=True),
-        },
+        "verify": safe_ow_dict([
+            (ev,           ow(read=False, history=False)),
+            (unverified_r, ow(read=True, send=True, history=True)),
+            (verified_r,   ow(read=False, history=False)),
+            (mod_r,        ow(read=True, send=True, history=True)),
+            (admin_r,      ow(read=True, send=True, history=True)),
+            (owner_r,      ow(read=True, send=True, history=True)),
+        ]),
+        "logs": safe_ow_dict([
+            (ev,      ow(read=False, history=False)),
+            (mod_r,   ow(read=True, send=True, history=True)),
+            (admin_r, ow(read=True, send=True, history=True)),
+            (owner_r, ow(read=True, send=True, history=True)),
+        ]),
+        "info": safe_ow_dict([
+            (ev,         ow(read=False, send=False, history=False)),
+            (verified_r, ow(read=True, send=False, history=True)),
+            (mod_r,      ow(read=True, send=True, history=True)),
+            (admin_r,    ow(read=True, send=True, history=True)),
+            (owner_r,    ow(read=True, send=True, history=True)),
+        ]),
+        "links": safe_ow_dict([
+            (ev,         ow(read=False, send=False, history=False)),
+            (verified_r, ow(read=True, send=False, history=True)),
+            (mod_r,      ow(read=True, send=True, history=True)),
+            (admin_r,    ow(read=True, send=True, history=True)),
+            (owner_r,    ow(read=True, send=True, history=True)),
+        ]),
+        "community": safe_ow_dict([
+            (ev,         ow(read=False, history=False)),
+            (verified_r, ow(read=True, send=True, history=True)),
+            (mod_r,      ow(read=True, send=True, history=True)),
+            (admin_r,    ow(read=True, send=True, history=True)),
+            (owner_r,    ow(read=True, send=True, history=True)),
+        ]),
+        "community_ro": safe_ow_dict([
+            (ev,         ow(read=False, send=False, history=False)),
+            (verified_r, ow(read=True, send=False, history=True)),
+            (mod_r,      ow(read=True, send=True, history=True)),
+            (admin_r,    ow(read=True, send=True, history=True)),
+            (owner_r,    ow(read=True, send=True, history=True)),
+        ]),
+        "support": safe_ow_dict([
+            (ev,         ow(read=False, history=False)),
+            (verified_r, ow(read=True, send=True, history=True)),
+            (mod_r,      ow(read=True, send=True, history=True)),
+            (admin_r,    ow(read=True, send=True, history=True)),
+            (owner_r,    ow(read=True, send=True, history=True)),
+        ]),
+        "media": safe_ow_dict([
+            (ev,         ow(read=False, history=False)),
+            (verified_r, ow(read=True, send=True, history=True)),
+            (mod_r,      ow(read=True, send=True, history=True)),
+            (admin_r,    ow(read=True, send=True, history=True)),
+            (owner_r,    ow(read=True, send=True, history=True)),
+        ]),
+        "staff": safe_ow_dict([
+            (ev,      ow(read=False, history=False)),
+            (mod_r,   ow(read=True, send=True, history=True)),
+            (admin_r, ow(read=True, send=True, history=True)),
+            (owner_r, ow(read=True, send=True, history=True)),
+        ]),
     }
 
     # Get or create the category
@@ -1182,14 +1186,14 @@ async def bb_build_one(guild, ch_name, cat_name, ow_type, roles):
 
     # Special case: suggestions forum
     if ow_type == "suggestions":
-        sug_ow = {
-            ev:           discord.PermissionOverwrite(read_messages=False, read_message_history=False, send_messages=False, create_public_threads=False),
-            unverified_r: discord.PermissionOverwrite(read_messages=False, read_message_history=False, send_messages=False, create_public_threads=False),
-            verified_r:   discord.PermissionOverwrite(read_messages=True, read_message_history=True, send_messages=True, create_public_threads=True),
-            mod_r:        discord.PermissionOverwrite(read_messages=True, read_message_history=True, send_messages=True, manage_messages=True, manage_threads=True, create_public_threads=True),
-            admin_r:      discord.PermissionOverwrite(read_messages=True, read_message_history=True, send_messages=True, manage_messages=True, manage_threads=True, create_public_threads=True),
-            owner_r:      discord.PermissionOverwrite(read_messages=True, read_message_history=True, send_messages=True, manage_messages=True, manage_threads=True, create_public_threads=True),
-        }
+        sug_ow = safe_ow_dict([
+            (ev,           discord.PermissionOverwrite(read_messages=False, read_message_history=False, send_messages=False, create_public_threads=False)),
+            (unverified_r, discord.PermissionOverwrite(read_messages=False, read_message_history=False, send_messages=False, create_public_threads=False)),
+            (verified_r,   discord.PermissionOverwrite(read_messages=True, read_message_history=True, send_messages=True, create_public_threads=True)),
+            (mod_r,        discord.PermissionOverwrite(read_messages=True, read_message_history=True, send_messages=True, manage_messages=True, manage_threads=True, create_public_threads=True)),
+            (admin_r,      discord.PermissionOverwrite(read_messages=True, read_message_history=True, send_messages=True, manage_messages=True, manage_threads=True, create_public_threads=True)),
+            (owner_r,      discord.PermissionOverwrite(read_messages=True, read_message_history=True, send_messages=True, manage_messages=True, manage_threads=True, create_public_threads=True)),
+        ])
         forum = await guild.create_forum(
             "suggestions",
             category=cat,
@@ -1254,7 +1258,7 @@ async def bb(ctx):
     guild = ctx.guild
     scanning_msg = await ctx.send("🔍 Scanning for missing channels...")
 
-    # Fetch roles
+    # Fetch roles — any that don't exist are None and safely skipped in overwrites
     owner_r      = discord.utils.get(guild.roles, name="{.Σ} Owner")
     admin_r      = discord.utils.get(guild.roles, name="{.Σ} Admin")
     mod_r        = discord.utils.get(guild.roles, name="{.Σ} Moderator")
@@ -1263,9 +1267,20 @@ async def bb(ctx):
     ev           = guild.default_role
     roles        = (owner_r, admin_r, mod_r, verified_r, unverified_r, ev)
 
-    if not all([owner_r, admin_r, mod_r, verified_r, unverified_r]):
-        await scanning_msg.edit(content="❌ Missing roles! Run `!build` first to create all roles before using `!bb`.")
-        return
+    missing_roles = [n for n, r in [
+        ("{.Σ} Owner", owner_r), ("{.Σ} Admin", admin_r), ("{.Σ} Moderator", mod_r),
+        ("✅ Verified", verified_r), ("❌ Unverified", unverified_r)
+    ] if r is None]
+    if missing_roles:
+        await scanning_msg.edit(
+            content=(
+                f"⚠️ Some roles are missing: {', '.join(f'`{r}`' for r in missing_roles)}\n"
+                f"Channels will still be built but **without permissions** for those roles. "
+                f"Run `!fixperms all` after creating the roles to apply them.\n\n"
+                f"Continuing scan in 3 seconds..."
+            )
+        )
+        await asyncio.sleep(3)
 
     # Find missing channels (up to 10 shown at a time)
     existing = {ch.name for ch in guild.channels}
