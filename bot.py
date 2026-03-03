@@ -1,167 +1,165 @@
-require("dotenv").config();
-const fs = require("fs");
-const path = require("path");
+import discord
+from discord.ext import commands
+import os
 
-const {
-  Client,
-  GatewayIntentBits,
-  EmbedBuilder,
-  REST,
-  Routes,
-  SlashCommandBuilder
-} = require("discord.js");
+# ===============================
+# INTENTS
+# ===============================
 
-const client = new Client({
-  intents: [
-    GatewayIntentBits.Guilds,
-    GatewayIntentBits.GuildMembers
-  ]
-});
+intents = discord.Intents.default()
+intents.members = True
+intents.message_content = True  # Required for prefix commands
 
-const DIVIDER = "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━";
+bot = commands.Bot(command_prefix="!", intents=intents)
 
-// Optional fallback URL if no local banner exists
-const FALLBACK_BANNER_URL = "https://your-banner-url-if-needed.com/banner.png";
+DIVIDER = "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+BANNER_FILE = "banner.png"  # Put banner.png in same folder
 
-// Detect local banner
-const localBannerPath = path.join(__dirname, "banner.png");
-const hasLocalBanner = fs.existsSync(localBannerPath);
 
-/* ===============================
-   FUNCTION: SEND BANNER
-================================ */
+# ===============================
+# READY EVENT
+# ===============================
 
-async function sendBanner(channel) {
-  if (hasLocalBanner) {
-    await channel.send({
-      files: [localBannerPath]
-    });
-  } else if (FALLBACK_BANNER_URL) {
-    await channel.send({
-      content: FALLBACK_BANNER_URL
-    });
-  }
-}
+@bot.event
+async def on_ready():
+    print(f"Logged in as {bot.user}")
+    print("Bot is online.")
 
-/* ===============================
-   JOIN EVENT
-================================ */
 
-client.on("guildMemberAdd", async (member) => {
-  const channel = member.guild.channels.cache.find(
-    c => c.name === "joins"
-  );
-  if (!channel) return;
+# ===============================
+# SEND BANNER FUNCTION
+# ===============================
 
-  // 1️⃣ Banner
-  await sendBanner(channel);
+async def send_banner(channel):
+    if os.path.exists(BANNER_FILE):
+        await channel.send(file=discord.File(BANNER_FILE))
+    else:
+        await channel.send("Banner file not found.")
 
-  // 2️⃣ Premium Embed
-  const embed = new EmbedBuilder()
-    .setColor("#2b2d31")
-    .setAuthor({
-      name: "Member Joined",
-      iconURL: member.user.displayAvatarURL({ dynamic: true })
-    })
-    .setTitle(`Welcome ${member} to ${member.guild.name}`)
-    .setDescription(
-      `> Account Created: <t:${Math.floor(member.user.createdTimestamp / 1000)}:R>\n` +
-      `> Member Count: **${member.guild.memberCount}**\n` +
-      `> User ID: \`${member.id}\``
+
+# ===============================
+# MEMBER JOIN
+# ===============================
+
+@bot.event
+async def on_member_join(member):
+    channel = discord.utils.get(member.guild.text_channels, name="joins")
+    if not channel:
+        return
+
+    # 1 Banner
+    await send_banner(channel)
+
+    # 2 Embed
+    embed = discord.Embed(
+        title=f"Welcome {member.mention} to {member.guild.name}",
+        color=discord.Color.dark_grey()
     )
-    .setThumbnail(member.user.displayAvatarURL({ dynamic: true, size: 512 }))
-    .setFooter({ text: `${member.guild.name} • New Arrival` })
-    .setTimestamp();
 
-  await channel.send({ embeds: [embed] });
-
-  // 3️⃣ Divider
-  await channel.send(DIVIDER);
-});
-
-/* ===============================
-   LEAVE EVENT
-================================ */
-
-client.on("guildMemberRemove", async (member) => {
-  const channel = member.guild.channels.cache.find(
-    c => c.name === "leaves"
-  );
-  if (!channel) return;
-
-  // 1️⃣ Banner
-  await sendBanner(channel);
-
-  // 2️⃣ Leave Embed
-  const embed = new EmbedBuilder()
-    .setColor("#1e1f22")
-    .setAuthor({
-      name: "Member Left",
-      iconURL: member.user.displayAvatarURL({ dynamic: true })
-    })
-    .setTitle(`${member.user.username} has left ${member.guild.name}`)
-    .setDescription(
-      `> Joined: <t:${Math.floor(member.joinedTimestamp / 1000)}:R>\n` +
-      `> Members Remaining: **${member.guild.memberCount}**\n` +
-      `> User ID: \`${member.id}\``
+    embed.set_author(
+        name="Member Joined",
+        icon_url=member.display_avatar.url
     )
-    .setThumbnail(member.user.displayAvatarURL({ dynamic: true, size: 512 }))
-    .setFooter({ text: `${member.guild.name} • Departure Logged` })
-    .setTimestamp();
 
-  await channel.send({ embeds: [embed] });
+    embed.add_field(
+        name="Account Created",
+        value=f"<t:{int(member.created_at.timestamp())}:R>",
+        inline=False
+    )
 
-  // 3️⃣ Divider
-  await channel.send(DIVIDER);
-});
+    embed.add_field(
+        name="Member Count",
+        value=str(member.guild.member_count),
+        inline=False
+    )
 
-/* ===============================
-   SLASH COMMANDS
-================================ */
+    embed.add_field(
+        name="User ID",
+        value=str(member.id),
+        inline=False
+    )
 
-const commands = [
-  new SlashCommandBuilder()
-    .setName("testjoin")
-    .setDescription("Simulate a member joining"),
-  new SlashCommandBuilder()
-    .setName("testleave")
-    .setDescription("Simulate a member leaving")
-].map(command => command.toJSON());
+    embed.set_thumbnail(url=member.display_avatar.url)
+    embed.set_footer(text=f"{member.guild.name} • New Arrival")
+    embed.timestamp = discord.utils.utcnow()
 
-client.once("ready", async () => {
-  console.log(`Logged in as ${client.user.tag}`);
+    await channel.send(embed=embed)
 
-  const rest = new REST({ version: "10" }).setToken(process.env.DISCORD_TOKEN);
+    # 3 Divider
+    await channel.send(DIVIDER)
 
-  try {
-    await rest.put(
-      Routes.applicationCommands(client.user.id),
-      { body: commands }
-    );
-    console.log("Slash commands registered.");
-  } catch (error) {
-    console.error(error);
-  }
-});
 
-client.on("interactionCreate", async (interaction) => {
-  if (!interaction.isChatInputCommand()) return;
+# ===============================
+# MEMBER LEAVE
+# ===============================
 
-  const member = interaction.member;
+@bot.event
+async def on_member_remove(member):
+    channel = discord.utils.get(member.guild.text_channels, name="leaves")
+    if not channel:
+        return
 
-  if (interaction.commandName === "testjoin") {
-    client.emit("guildMemberAdd", member);
-    await interaction.reply({ content: "Simulated join.", ephemeral: true });
-  }
+    # 1 Banner
+    await send_banner(channel)
 
-  if (interaction.commandName === "testleave") {
-    client.emit("guildMemberRemove", member);
-    await interaction.reply({ content: "Simulated leave.", ephemeral: true });
-  }
-});
+    # 2 Embed
+    embed = discord.Embed(
+        title=f"{member.name} has left {member.guild.name}",
+        color=discord.Color.dark_gray()
+    )
 
-/* ===============================
-   LOGIN
-================================ */
+    embed.set_author(
+        name="Member Left",
+        icon_url=member.display_avatar.url
+    )
 
-client.login(process.env.DISCORD_TOKEN);
+    if member.joined_at:
+        embed.add_field(
+            name="Joined Server",
+            value=f"<t:{int(member.joined_at.timestamp())}:R>",
+            inline=False
+        )
+
+    embed.add_field(
+        name="Members Remaining",
+        value=str(member.guild.member_count),
+        inline=False
+    )
+
+    embed.add_field(
+        name="User ID",
+        value=str(member.id),
+        inline=False
+    )
+
+    embed.set_thumbnail(url=member.display_avatar.url)
+    embed.set_footer(text=f"{member.guild.name} • Departure Logged")
+    embed.timestamp = discord.utils.utcnow()
+
+    await channel.send(embed=embed)
+
+    # 3 Divider
+    await channel.send(DIVIDER)
+
+
+# ===============================
+# TEST COMMANDS
+# ===============================
+
+@bot.command()
+async def testjoin(ctx):
+    await on_member_join(ctx.author)
+    await ctx.send("Simulated join.")
+
+
+@bot.command()
+async def testleave(ctx):
+    await on_member_remove(ctx.author)
+    await ctx.send("Simulated leave.")
+
+
+# ===============================
+# RUN BOT
+# ===============================
+
+bot.run(os.getenv("DISCORD_TOKEN"))
