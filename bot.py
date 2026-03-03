@@ -37,11 +37,10 @@ CHANNEL_EMBEDS = {
     "questions":         "❓ Have a question about the server, game, or community? Ask here!",
     "hall-of-shame":     "😬 Post your most embarrassing moments, worst fails, and biggest L's here. Keep it fun, not personal attacks!",
     "bot-commands":      "🤖 Use all bot commands in this channel to keep other channels clean.",
-    "community-codes":   "🎁 Got any codes You want to share? post them here.",
+    "community-codes":   "🎁Got any codes You want to share with our community? Post them here.",
     "joins":             "📥 Member join logs are recorded here automatically.",
     "leaves":            "📤 Member leave logs are recorded here automatically.",
     "roblox-chat":       "🎮 Talk about Roblox games, updates, and anything Roblox related here!",
-    "game-suggestions":  "💡 Got an idea for a game or feature? Drop your suggestions here!",
     "looking-to-play":   "🕹️ Looking for someone to play with? Post here and find a squad!",
     "photos":            "📷 Share your photos and screenshots here. Keep it family friendly!",
     "videos":            "🎥 Post your videos and clips here. Only share original or credited content.",
@@ -58,9 +57,40 @@ CHANNEL_EMBEDS = {
     "logs":              "📋 Server logs are recorded here automatically.",
 }
 
+# Suggestions forum format guide shown as the first post in the forum
+SUGGESTIONS_GUIDE = """📋 **HOW TO POST A SUGGESTION**
+
+Before posting, make sure your suggestion follows this format:
+
+**Title:** Give your suggestion a short, clear title.
+
+**Description:**
+A clear explanation of your suggestion. What is it? How would it work?
+
+**Why it would help:**
+Why should we add this? How does it benefit the server or community?
+
+**Examples (optional):**
+Any examples, references, or screenshots that help explain your idea.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+✅ **DO:**
+- Be specific and detailed
+- Keep it respectful and constructive
+- Check if your suggestion already exists before posting
+- React with 👍 or 👎 on suggestions you agree or disagree with
+
+❌ **DON'T:**
+- Post duplicate suggestions
+- Be rude or dismissive of others' ideas
+- Post anything unrelated to the server or community
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+All suggestions are reviewed by staff. We appreciate every idea! 💜"""
+
 # =========================
 # HELPER: FIND CHANNEL BY NAME
-# Searches by exact name since channels have no prefix.
 # =========================
 def find_channel(guild, name):
     for ch in guild.text_channels:
@@ -97,7 +127,7 @@ async def send_banner(channel):
 
 # =========================
 # HELPER: SEND CHANNEL EMBED
-# Banner first, then embed below it. Used for build and updatechan.
+# Banner first, then embed below it.
 # =========================
 async def send_channel_embed(channel, channel_key=None):
     if channel_key is None:
@@ -360,18 +390,92 @@ async def build(ctx):
         ch = await guild.create_text_channel(ch_name, category=community_cat, overwrites=community_readonly_ow)
         await send_channel_embed(ch, ch_name)
 
-    # GAMING
-    gaming_ow = {
+    # SUPPORT (formerly GAMING) - includes suggestions forum
+    support_ow = {
         ev:         ow(read=False, history=False),
         verified_r: ow(read=True, send=True, history=True),
         mod_r:      ow(read=True, send=True, history=True),
         admin_r:    ow(read=True, send=True, history=True),
         owner_r:    ow(read=True, send=True, history=True),
     }
-    gaming_cat = await guild.create_category("{.Σ} ───── GAMING ─────", overwrites=gaming_ow)
-    for ch_name in ["roblox-chat", "game-suggestions", "looking-to-play"]:
-        ch = await guild.create_text_channel(ch_name, category=gaming_cat, overwrites=gaming_ow)
+    support_cat = await guild.create_category("{.Σ} ───── SUPPORT ─────", overwrites=support_ow)
+
+    # Regular support channels
+    for ch_name in ["roblox-chat", "looking-to-play"]:
+        ch = await guild.create_text_channel(ch_name, category=support_cat, overwrites=support_ow)
         await send_channel_embed(ch, ch_name)
+
+    # Suggestions forum channel
+    # Unverified can see but not post. Everyone else can post.
+    suggestions_ow = {
+        ev:           discord.PermissionOverwrite(
+            read_messages=False,
+            read_message_history=False,
+            send_messages=False,
+            create_public_threads=False,
+            use_application_commands=False
+        ),
+        unverified_r: discord.PermissionOverwrite(
+            read_messages=False,
+            read_message_history=False,
+            send_messages=False,
+            create_public_threads=False
+        ),
+        verified_r:   discord.PermissionOverwrite(
+            read_messages=True,
+            read_message_history=True,
+            send_messages=True,
+            create_public_threads=True,
+            use_application_commands=True
+        ),
+        mod_r:        discord.PermissionOverwrite(
+            read_messages=True,
+            read_message_history=True,
+            send_messages=True,
+            manage_messages=True,
+            manage_threads=True,
+            create_public_threads=True
+        ),
+        admin_r:      discord.PermissionOverwrite(
+            read_messages=True,
+            read_message_history=True,
+            send_messages=True,
+            manage_messages=True,
+            manage_threads=True,
+            create_public_threads=True
+        ),
+        owner_r:      discord.PermissionOverwrite(
+            read_messages=True,
+            read_message_history=True,
+            send_messages=True,
+            manage_messages=True,
+            manage_threads=True,
+            create_public_threads=True
+        ),
+    }
+
+    suggestions_ch = await guild.create_forum(
+        "suggestions",
+        category=support_cat,
+        topic="Got an idea? Post it here using the format guide pinned at the top!",
+        overwrites=suggestions_ow,
+        available_tags=[
+            discord.ForumTag(name="💡 Idea"),
+            discord.ForumTag(name="🎮 Game"),
+            discord.ForumTag(name="🛡️ Server"),
+            discord.ForumTag(name="🤖 Bot"),
+            discord.ForumTag(name="✅ Approved"),
+            discord.ForumTag(name="❌ Denied"),
+            discord.ForumTag(name="👀 Under Review"),
+        ]
+    )
+
+    # Post the format guide as the first thread in the forum
+    await suggestions_ch.create_thread(
+        name="📋 READ BEFORE POSTING — Suggestion Format Guide",
+        content=SUGGESTIONS_GUIDE,
+        auto_archive_duration=10080,  # 7 days
+    )
 
     # MEDIA ZONE
     media_ow = {
@@ -482,7 +586,7 @@ async def fixperms(ctx, *, target=None):
         return
 
     target = target.lower()
-    cats_to_fix = ["links", "information", "community", "verification", "gaming", "media"] if target == "all" else [target]
+    cats_to_fix = ["links", "information", "community", "verification", "support", "media"] if target == "all" else [target]
 
     for cat in ctx.guild.categories:
         if any(c in cat.name.lower() for c in cats_to_fix):
@@ -537,7 +641,7 @@ async def scan(ctx):
             perms = [f"{p}: {v}" for p, v in ow if v is not None]
             output.append(f"      {t.name}: {', '.join(perms)}")
         for ch in cat.channels:
-            ch_type = "💬" if isinstance(ch, discord.TextChannel) else "🔊"
+            ch_type = "💬" if isinstance(ch, discord.TextChannel) else "🔊" if isinstance(ch, discord.VoiceChannel) else "📋"
             output.append(f"\n   {ch_type} {ch.name} (ID: {ch.id})")
             for t, ow in ch.overwrites.items():
                 perms = [f"{p}: {v}" for p, v in ow if v is not None]
