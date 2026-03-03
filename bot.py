@@ -830,3 +830,189 @@ async def shutdown(ctx):
 # =========================
 keep_alive()
 bot.run(TOKEN)
+
+
+@bot.command()
+@commands.is_owner()
+async def bb(ctx):
+    """Build any missing channels that don't exist yet without touching existing ones."""
+    guild = ctx.guild
+    msg = await ctx.send("🔍 Checking for missing channels...")
+
+    # Get all current channel names
+    existing = {ch.name for ch in guild.channels}
+
+    # Get roles
+    owner_r      = discord.utils.get(guild.roles, name="{.Σ} Owner")
+    admin_r      = discord.utils.get(guild.roles, name="{.Σ} Admin")
+    mod_r        = discord.utils.get(guild.roles, name="{.Σ} Moderator")
+    verified_r   = discord.utils.get(guild.roles, name="✅ Verified")
+    unverified_r = discord.utils.get(guild.roles, name="❌ Unverified")
+    ev           = guild.default_role
+
+    if not all([owner_r, admin_r, mod_r, verified_r, unverified_r]):
+        await msg.edit(content="❌ Missing roles! Run `!build` first to create roles before using `!bb`.")
+        return
+
+    def ow(read=None, send=None, history=None):
+        return discord.PermissionOverwrite(
+            read_messages=read,
+            send_messages=send,
+            read_message_history=history
+        )
+
+    # Helper to get or create a category by name
+    async def get_or_create_category(name, overwrites):
+        cat = discord.utils.get(guild.categories, name=name)
+        if not cat:
+            cat = await guild.create_category(name, overwrites=overwrites)
+        return cat
+
+    # Helper to build a missing text channel
+    async def maybe_create(name, category, overwrites, key=None):
+        if name not in existing:
+            ch = await guild.create_text_channel(name, category=category, overwrites=overwrites)
+            await send_channel_embed(ch, key or name)
+            return True
+        return False
+
+    created = []
+
+    # ── VERIFICATION ──
+    verify_ow = {
+        ev:           ow(read=False, history=False),
+        unverified_r: ow(read=True, send=True, history=True),
+        verified_r:   ow(read=False, history=False),
+        mod_r:        ow(read=True, send=True, history=True),
+        admin_r:      ow(read=True, send=True, history=True),
+        owner_r:      ow(read=True, send=True, history=True),
+    }
+    verify_cat = await get_or_create_category("{.Σ} ───── VERIFICATION ─────", verify_ow)
+    if await maybe_create("verification", verify_cat, verify_ow): created.append("verification")
+
+    # ── LOGS ──
+    logs_ow = {
+        ev:      ow(read=False, history=False),
+        mod_r:   ow(read=True, send=True, history=True),
+        admin_r: ow(read=True, send=True, history=True),
+        owner_r: ow(read=True, send=True, history=True),
+    }
+    logs_cat = await get_or_create_category("{.Σ} ───── LOGS ─────", logs_ow)
+    if await maybe_create("logs", logs_cat, logs_ow): created.append("logs")
+
+    # ── INFORMATION ──
+    info_ow = {
+        ev:         ow(read=False, send=False, history=False),
+        verified_r: ow(read=True, send=False, history=True),
+        mod_r:      ow(read=True, send=True, history=True),
+        admin_r:    ow(read=True, send=True, history=True),
+        owner_r:    ow(read=True, send=True, history=True),
+    }
+    info_cat = await get_or_create_category("{.Σ} ───── INFORMATION ─────", info_ow)
+    for ch_name in ["welcome", "rules", "announcements", "updates"]:
+        if await maybe_create(ch_name, info_cat, info_ow): created.append(ch_name)
+
+    # ── LINKS ──
+    links_ow = {
+        ev:         ow(read=False, send=False, history=False),
+        verified_r: ow(read=True, send=False, history=True),
+        mod_r:      ow(read=True, send=True, history=True),
+        admin_r:    ow(read=True, send=True, history=True),
+        owner_r:    ow(read=True, send=True, history=True),
+    }
+    links_cat = await get_or_create_category("{.Σ} ───── LINKS ─────", links_ow)
+    for ch_name in ["roblox-group", "game-links", "my-profile", "youtube-links"]:
+        if await maybe_create(ch_name, links_cat, links_ow): created.append(ch_name)
+
+    # ── COMMUNITY ──
+    community_ow = {
+        ev:         ow(read=False, history=False),
+        verified_r: ow(read=True, send=True, history=True),
+        mod_r:      ow(read=True, send=True, history=True),
+        admin_r:    ow(read=True, send=True, history=True),
+        owner_r:    ow(read=True, send=True, history=True),
+    }
+    community_readonly_ow = {
+        ev:         ow(read=False, send=False, history=False),
+        verified_r: ow(read=True, send=False, history=True),
+        mod_r:      ow(read=True, send=True, history=True),
+        admin_r:    ow(read=True, send=True, history=True),
+        owner_r:    ow(read=True, send=True, history=True),
+    }
+    community_cat = await get_or_create_category("{.Σ} ───── COMMUNITY ─────", community_ow)
+    for ch_name in ["general", "memes", "polls", "questions", "community-codes", "joins", "leaves"]:
+        if await maybe_create(ch_name, community_cat, community_ow): created.append(ch_name)
+    for ch_name in ["hall-of-shame", "bot-commands"]:
+        if await maybe_create(ch_name, community_cat, community_readonly_ow): created.append(ch_name)
+
+    # ── SUPPORT ──
+    support_ow = {
+        ev:         ow(read=False, history=False),
+        verified_r: ow(read=True, send=True, history=True),
+        mod_r:      ow(read=True, send=True, history=True),
+        admin_r:    ow(read=True, send=True, history=True),
+        owner_r:    ow(read=True, send=True, history=True),
+    }
+    support_cat = await get_or_create_category("{.Σ} ───── SUPPORT ─────", support_ow)
+    for ch_name in ["roblox-chat", "looking-to-play"]:
+        if await maybe_create(ch_name, support_cat, support_ow): created.append(ch_name)
+
+    # Suggestions forum
+    if "suggestions" not in existing:
+        suggestions_ow = {
+            ev:           discord.PermissionOverwrite(read_messages=False, read_message_history=False, send_messages=False, create_public_threads=False),
+            unverified_r: discord.PermissionOverwrite(read_messages=False, read_message_history=False, send_messages=False, create_public_threads=False),
+            verified_r:   discord.PermissionOverwrite(read_messages=True, read_message_history=True, send_messages=True, create_public_threads=True),
+            mod_r:        discord.PermissionOverwrite(read_messages=True, read_message_history=True, send_messages=True, manage_messages=True, manage_threads=True, create_public_threads=True),
+            admin_r:      discord.PermissionOverwrite(read_messages=True, read_message_history=True, send_messages=True, manage_messages=True, manage_threads=True, create_public_threads=True),
+            owner_r:      discord.PermissionOverwrite(read_messages=True, read_message_history=True, send_messages=True, manage_messages=True, manage_threads=True, create_public_threads=True),
+        }
+        suggestions_ch = await guild.create_forum(
+            "suggestions",
+            category=support_cat,
+            topic="Got an idea? Post it here using the format guide pinned at the top!",
+            overwrites=suggestions_ow,
+            available_tags=[
+                discord.ForumTag(name="💡 Idea"),
+                discord.ForumTag(name="🎮 Game"),
+                discord.ForumTag(name="🛡️ Server"),
+                discord.ForumTag(name="🤖 Bot"),
+                discord.ForumTag(name="✅ Approved"),
+                discord.ForumTag(name="❌ Denied"),
+                discord.ForumTag(name="👀 Under Review"),
+            ]
+        )
+        await suggestions_ch.create_thread(
+            name="📋 READ BEFORE POSTING — Suggestion Format Guide",
+            content=SUGGESTIONS_GUIDE,
+            auto_archive_duration=10080,
+        )
+        created.append("suggestions")
+
+    # ── MEDIA ZONE ──
+    media_ow = {
+        ev:         ow(read=False, history=False),
+        verified_r: ow(read=True, send=True, history=True),
+        mod_r:      ow(read=True, send=True, history=True),
+        admin_r:    ow(read=True, send=True, history=True),
+        owner_r:    ow(read=True, send=True, history=True),
+    }
+    media_cat = await get_or_create_category("{.Σ} ───── MEDIA ZONE ─────", media_ow)
+    for ch_name in ["photos", "videos", "clips", "artwork", "music", "selfies", "edits", "stream-highlights"]:
+        if await maybe_create(ch_name, media_cat, media_ow): created.append(ch_name)
+
+    # ── STAFF ──
+    staff_ow = {
+        ev:      ow(read=False, history=False),
+        mod_r:   ow(read=True, send=True, history=True),
+        admin_r: ow(read=True, send=True, history=True),
+        owner_r: ow(read=True, send=True, history=True),
+    }
+    staff_cat = await get_or_create_category("{.Σ} ───── STAFF ─────", staff_ow)
+    for ch_name in ["staff-chat", "mod-logs", "admin-only", "private-bot-cmds"]:
+        if await maybe_create(ch_name, staff_cat, staff_ow): created.append(ch_name)
+
+    if created:
+        await msg.edit(content=f"✅ Built {len(created)} missing channel(s): {', '.join(f'`{c}`' for c in created)}")
+    else:
+        await msg.edit(content="✅ All channels already exist, nothing to build!")
