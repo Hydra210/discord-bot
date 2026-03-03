@@ -1030,6 +1030,283 @@ async def botcommands(ctx):
     )
     await ctx.send(embed=embed)
 
+
+# =========================
+# BOT MESSAGE CREATOR
+# =========================
+@bot.command()
+@commands.is_owner()
+async def bm(ctx):
+    """Interactive bot message builder with 4 message types."""
+
+    TYPE_EMOJIS = ["\u0031\ufe0f\u20e3", "\u0032\ufe0f\u20e3", "\u0033\ufe0f\u20e3", "\u0034\ufe0f\u20e3"]
+
+    async def wait_for_reply(prompt_msg, timeout=300):
+        def check(m):
+            return (
+                m.author == ctx.author
+                and m.channel == ctx.channel
+                and m.reference is not None
+                and m.reference.message_id == prompt_msg.id
+            )
+        try:
+            reply = await bot.wait_for("message", check=check, timeout=timeout)
+            return reply.content.strip(), reply
+        except asyncio.TimeoutError:
+            return None, None
+
+    async def do_send(channel, msg_type, message_content, description_text=None):
+        if msg_type == 1:
+            e = discord.Embed(description=message_content, color=EMBED_COLOR)
+            await channel.send(embed=e)
+        elif msg_type == 2:
+            try:
+                await channel.send(file=discord.File(BANNER_FILE))
+            except FileNotFoundError:
+                pass
+            await channel.send(embed=discord.Embed(description=description_text, color=EMBED_COLOR))
+            await channel.send(embed=discord.Embed(description=message_content, color=EMBED_COLOR))
+        elif msg_type == 3:
+            e = discord.Embed(description=message_content, color=EMBED_COLOR)
+            e.set_image(url="attachment://banner.png")
+            try:
+                await channel.send(embed=e, file=discord.File(BANNER_FILE, filename="banner.png"))
+            except FileNotFoundError:
+                await channel.send(embed=e)
+        elif msg_type == 4:
+            try:
+                await channel.send(file=discord.File(BANNER_FILE))
+            except FileNotFoundError:
+                pass
+            await channel.send(embed=discord.Embed(description=message_content, color=EMBED_COLOR))
+
+    async def do_preview(msg_type, message_content, description_text=None):
+        sent = []
+        if msg_type == 1:
+            e = discord.Embed(description=message_content, color=EMBED_COLOR)
+            sent.append(await ctx.send(embed=e))
+        elif msg_type == 2:
+            try:
+                sent.append(await ctx.send(file=discord.File(BANNER_FILE)))
+            except FileNotFoundError:
+                pass
+            sent.append(await ctx.send(embed=discord.Embed(description=description_text, color=EMBED_COLOR)))
+            sent.append(await ctx.send(embed=discord.Embed(description=message_content, color=EMBED_COLOR)))
+        elif msg_type == 3:
+            e = discord.Embed(description=message_content, color=EMBED_COLOR)
+            e.set_image(url="attachment://banner.png")
+            try:
+                sent.append(await ctx.send(embed=e, file=discord.File(BANNER_FILE, filename="banner.png")))
+            except FileNotFoundError:
+                sent.append(await ctx.send(embed=e))
+        elif msg_type == 4:
+            try:
+                sent.append(await ctx.send(file=discord.File(BANNER_FILE)))
+            except FileNotFoundError:
+                pass
+            sent.append(await ctx.send(embed=discord.Embed(description=message_content, color=EMBED_COLOR)))
+        return sent
+
+    # STEP 1: Pick type
+    type_desc = (
+        "Which message type would you like to create?\n\n"
+        "\u0031\ufe0f\u20e3 \u2014 Embed with message content only\n"
+        "\u0032\ufe0f\u20e3 \u2014 Banner + description embed + message embed\n"
+        "\u0033\ufe0f\u20e3 \u2014 Embed with message content + banner at bottom\n"
+        "\u0034\ufe0f\u20e3 \u2014 Banner (separate) + message embed\n\n"
+        "React to select a type. Session times out after **120s**."
+    )
+    type_embed = discord.Embed(title="\U0001f4dd Bot Message Creator", description=type_desc, color=EMBED_COLOR)
+    type_msg = await ctx.send(embed=type_embed)
+    for e in TYPE_EMOJIS:
+        await type_msg.add_reaction(e)
+
+    def type_check(reaction, user):
+        return (
+            user == ctx.author
+            and reaction.message.id == type_msg.id
+            and str(reaction.emoji) in TYPE_EMOJIS
+        )
+    try:
+        reaction, _ = await bot.wait_for("reaction_add", check=type_check, timeout=120)
+    except asyncio.TimeoutError:
+        await type_msg.edit(embed=discord.Embed(title="\u23f0 Timed out.", color=discord.Color.orange()))
+        try:
+            await type_msg.clear_reactions()
+        except Exception:
+            pass
+        return
+
+    msg_type = TYPE_EMOJIS.index(str(reaction.emoji)) + 1
+    try:
+        await type_msg.clear_reactions()
+    except Exception:
+        pass
+    await type_msg.edit(embed=discord.Embed(
+        description=f"\u2705 **Type {msg_type} selected.**",
+        color=EMBED_COLOR
+    ))
+
+    # STEP 2: Collect content
+    description_text = None
+    message_content = None
+
+    if msg_type == 2:
+        desc_prompt = await ctx.send(embed=discord.Embed(
+            description="**Reply to this message** with your **description** text.",
+            color=EMBED_COLOR
+        ))
+        description_text, desc_reply = await wait_for_reply(desc_prompt)
+        if description_text is None:
+            await desc_prompt.edit(embed=discord.Embed(description="\u23f0 Timed out.", color=discord.Color.orange()))
+            return
+        try:
+            await desc_reply.delete()
+        except Exception:
+            pass
+        await desc_prompt.edit(embed=discord.Embed(description="\u2705 Description saved.", color=EMBED_COLOR))
+
+        content_prompt = await ctx.send(embed=discord.Embed(
+            description="**Reply to this message** with your **main message content**.",
+            color=EMBED_COLOR
+        ))
+        message_content, content_reply = await wait_for_reply(content_prompt)
+        if message_content is None:
+            await content_prompt.edit(embed=discord.Embed(description="\u23f0 Timed out.", color=discord.Color.orange()))
+            return
+        try:
+            await content_reply.delete()
+        except Exception:
+            pass
+        await content_prompt.edit(embed=discord.Embed(description="\u2705 Message content saved.", color=EMBED_COLOR))
+
+    else:
+        content_prompt = await ctx.send(embed=discord.Embed(
+            description="**Reply to this message** with your **message content**.",
+            color=EMBED_COLOR
+        ))
+        message_content, content_reply = await wait_for_reply(content_prompt)
+        if message_content is None:
+            await content_prompt.edit(embed=discord.Embed(description="\u23f0 Timed out.", color=discord.Color.orange()))
+            return
+        try:
+            await content_reply.delete()
+        except Exception:
+            pass
+        await content_prompt.edit(embed=discord.Embed(description="\u2705 Message content saved.", color=EMBED_COLOR))
+
+    # STEP 3: Channel selection
+    chan_desc = (
+        "**Reply to this message** with the channel to send to.\n\n"
+        "Type **#channel-name** to pick a channel, or **C** for the current channel."
+    )
+    chan_prompt = await ctx.send(embed=discord.Embed(description=chan_desc, color=EMBED_COLOR))
+    chan_content, chan_reply = await wait_for_reply(chan_prompt, timeout=120)
+    if chan_content is None:
+        await chan_prompt.edit(embed=discord.Embed(description="\u23f0 Timed out.", color=discord.Color.orange()))
+        return
+    try:
+        await chan_reply.delete()
+    except Exception:
+        pass
+
+    if chan_content.upper() == "C":
+        target_channel = ctx.channel
+    elif chan_reply.channel_mentions:
+        target_channel = chan_reply.channel_mentions[0]
+    else:
+        name = chan_content.lstrip("#").strip()
+        target_channel = find_channel(ctx.guild, name)
+        if not target_channel:
+            await chan_prompt.edit(embed=discord.Embed(
+                description="\u274c Channel not found. Mention it with **#channel-name** or type **C**.",
+                color=discord.Color.red()
+            ))
+            return
+
+    await chan_prompt.edit(embed=discord.Embed(
+        description=f"\u2705 Channel set to {target_channel.mention}.",
+        color=EMBED_COLOR
+    ))
+
+    # STEP 4: Preview
+    preview_header = await ctx.send(embed=discord.Embed(
+        title="\U0001f441\ufe0f This is the final draft of your message. Ready to send?",
+        description=f"**Sending to:** {target_channel.mention}\n\u200b\n*(This preview is only visible here \u2014 the message has not been sent yet.)*",
+        color=EMBED_COLOR
+    ))
+    preview_msgs = await do_preview(msg_type, message_content, description_text)
+
+    confirm_msg = await ctx.send(embed=discord.Embed(
+        description="React with \u2705 to **send** or \u274c to **start over**.",
+        color=EMBED_COLOR
+    ))
+    await confirm_msg.add_reaction("\u2705")
+    await confirm_msg.add_reaction("\u274c")
+
+    def confirm_check(reaction, user):
+        return (
+            user == ctx.author
+            and reaction.message.id == confirm_msg.id
+            and str(reaction.emoji) in ["\u2705", "\u274c"]
+        )
+    try:
+        confirm_reaction, _ = await bot.wait_for("reaction_add", check=confirm_check, timeout=120)
+    except asyncio.TimeoutError:
+        for m in preview_msgs:
+            try:
+                await m.delete()
+            except Exception:
+                pass
+        try:
+            await preview_header.delete()
+        except Exception:
+            pass
+        await confirm_msg.edit(embed=discord.Embed(description="\u23f0 Timed out.", color=discord.Color.orange()))
+        try:
+            await confirm_msg.clear_reactions()
+        except Exception:
+            pass
+        return
+
+    for m in preview_msgs:
+        try:
+            await m.delete()
+        except Exception:
+            pass
+    try:
+        await preview_header.delete()
+    except Exception:
+        pass
+    try:
+        await confirm_msg.delete()
+    except Exception:
+        pass
+
+    if str(confirm_reaction.emoji) == "\u274c":
+        restart_msg = await ctx.send(embed=discord.Embed(
+            description="\U0001f504 Starting over...",
+            color=discord.Color.orange()
+        ))
+        await asyncio.sleep(2)
+        try:
+            await restart_msg.delete()
+        except Exception:
+            pass
+        await ctx.invoke(bot.get_command("bm"))
+        return
+
+    # STEP 5: Send for real
+    await do_send(target_channel, msg_type, message_content, description_text)
+    await ctx.send(
+        embed=discord.Embed(
+            description=f"\u2705 Message sent to {target_channel.mention}!",
+            color=discord.Color.green()
+        ),
+        delete_after=10
+    )
+
+
 # =========================
 # TEST COMMANDS
 # =========================
