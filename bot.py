@@ -11,7 +11,7 @@ import asyncio
 TOKEN = os.getenv("DISCORD_TOKEN")
 
 intents = discord.Intents.all()
-intents.members = True  # explicitly required for on_member_join/remove to fire
+intents.members = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
 DIVIDER = "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -20,40 +20,27 @@ EMBED_COLOR = discord.Color.from_str("#501e78")
 
 # =========================
 # CHANNEL EMBED CONTENT
-# Matches your exact server layout from the scan.
-# Keys are the channel names (without {.Σ}- prefix).
 # =========================
 CHANNEL_EMBEDS = {
-    # VERIFICATION
-    "verification": "✅ React below to verify yourself and gain access to the server!",
-
-    # INFORMATION
-    "welcome":       "👋 Welcome to **{.Σ} .ΣXΣ AUDIOS**!\n\nBefore anything else, head over to <#rules> and give them a read. We keep this server clean and fun for everyone — knowing the rules is step one.\n\nOnce you're verified, you'll unlock the full server. We're glad you're here! 🎉",
-    "rules":         "**{.Σ} .ΣXΣ AUDIOS — SERVER RULES**\n\n> Follow these rules at all times. Breaking them will result in a warning, mute, kick, or ban depending on severity.\n\n**1.** Respect everyone — no harassment, hate speech, or toxicity.\n**2.** No NSFW content of any kind.\n**3.** No spamming or flooding channels.\n**4.** No advertising without permission from staff.\n**5.** Follow Discord's Terms of Service at all times.\n**6.** Listen to staff — their word is final.\n**7.** Keep content in the correct channels.\n**8.** No sharing personal information of others.\n**9.** Have fun and be a good community member! ✅",
-    "announcements": "📣 Important announcements from staff will be posted here. Stay up to date!",
-    "updates":       "🔔 Game, server, and project updates are posted here. Check back often!",
-
-    # LINKS
-    "roblox-group":  "🎮 Our official Roblox group link is pinned here. Join to get exclusive in-game perks!",
-    "game-links":    "🕹️ Links to all of our Roblox games are pinned here. Jump in and play!",
-    "my-profile":    "👤 Links to our creator's Roblox profile and social pages are pinned here.",
-    "youtube-links": "▶️ Our YouTube videos and content drops are linked here. Go watch and subscribe!",
-
-    # COMMUNITY
-    "general":          "💬 The main hangout spot. Talk about anything and everything here!",
-    "memes":            "😂 Post the funniest memes you find. Keep it appropriate!",
-    "polls":            "📊 Community polls are posted here. Vote and make your voice heard!",
-    "questions":        "❓ Have a question about the server, game, or community? Ask here!",
-    "hall-of-shame":    "😬 Post your most embarrassing moments, worst fails, and biggest L's here. Keep it fun, not personal attacks!",
-    "bot-commands":     "🤖 Use all bot commands in this channel to keep other channels clean.",
-    "community-codes":  "🎁 Community codes and giveaways are dropped here. Stay active to catch them!",
-
-    # GAMING
-    "roblox-chat":      "🎮 Talk about Roblox games, updates, and anything Roblox related here!",
-    "game-suggestions": "💡 Got an idea for a game or feature? Drop your suggestions here!",
-    "looking-to-play":  "🕹️ Looking for someone to play with? Post here and find a squad!",
-
-    # MEDIA ZONE
+    "verification":      "✅ React below to verify yourself and gain access to the server!",
+    "welcome":           "👋 Welcome to **{.Σ} .ΣXΣ AUDIOS**!\n\nBefore anything else, head over to the rules channel and give them a read. We keep this server clean and fun for everyone — knowing the rules is step one.\n\nOnce you're verified, you'll unlock the full server. We're glad you're here! 🎉",
+    "rules":             "**{.Σ} .ΣXΣ AUDIOS — SERVER RULES**\n\n> Follow these rules at all times. Breaking them will result in a warning, mute, kick, or ban depending on severity.\n\n**1.** Respect everyone — no harassment, hate speech, or toxicity.\n**2.** No NSFW content of any kind.\n**3.** No spamming or flooding channels.\n**4.** No advertising without permission from staff.\n**5.** Follow Discord's Terms of Service at all times.\n**6.** Listen to staff — their word is final.\n**7.** Keep content in the correct channels.\n**8.** No sharing personal information of others.\n**9.** Have fun and be a good community member! ✅",
+    "announcements":     "📣 Important announcements from staff will be posted here. Stay up to date!",
+    "updates":           "🔔 Game, server, and project updates are posted here. Check back often!",
+    "roblox-group":      "🎮 Our official Roblox group link is pinned here. Join to get exclusive in-game perks!",
+    "game-links":        "🕹️ Links to all of our Roblox games are pinned here. Jump in and play!",
+    "my-profile":        "👤 Links to our creator's Roblox profile and social pages are pinned here.",
+    "youtube-links":     "▶️ Our YouTube videos and content drops are linked here. Go watch and subscribe!",
+    "general":           "💬 The main hangout spot. Talk about anything and everything here!",
+    "memes":             "😂 Post the funniest memes you find. Keep it appropriate!",
+    "polls":             "📊 Community polls are posted here. Vote and make your voice heard!",
+    "questions":         "❓ Have a question about the server, game, or community? Ask here!",
+    "hall-of-shame":     "😬 Post your most embarrassing moments, worst fails, and biggest L's here. Keep it fun, not personal attacks!",
+    "bot-commands":      "🤖 Use all bot commands in this channel to keep other channels clean.",
+    "community-codes":   "🎁 Community codes and giveaways are dropped here. Stay active to catch them!",
+    "roblox-chat":       "🎮 Talk about Roblox games, updates, and anything Roblox related here!",
+    "game-suggestions":  "💡 Got an idea for a game or feature? Drop your suggestions here!",
+    "looking-to-play":   "🕹️ Looking for someone to play with? Post here and find a squad!",
     "photos":            "📷 Share your photos and screenshots here. Keep it family friendly!",
     "videos":            "🎥 Post your videos and clips here. Only share original or credited content.",
     "clips":             "✂️ Share short clips from games, streams, or anything cool here.",
@@ -62,14 +49,12 @@ CHANNEL_EMBEDS = {
     "selfies":           "🤳 Share your selfies here! Be kind and hype each other up.",
     "edits":             "✨ Show off your photo and video edits here. Tag the tools you used!",
     "stream-highlights": "📡 Best moments from streams go here. Clips, timestamps — share it all!",
-
-    # STAFF
-    "staff-chat":      "🛡️ Staff only chat. Keep discussions professional and on-topic.",
-    "mod-logs":        "📋 Automated moderation logs are recorded here.",
-    "admin-only":      "⚙️ Admin-only channel for important decisions and high-level management.",
-    "joins":           "📥 Member join logs are recorded here automatically.",
-    "leaves":          "📤 Member leave logs are recorded here automatically.",
-    "private-bot-cmds":"🤖 Private channel for owner bot commands only.",
+    "staff-chat":        "🛡️ Staff only chat. Keep discussions professional and on-topic.",
+    "mod-logs":          "📋 Automated moderation logs are recorded here.",
+    "admin-only":        "⚙️ Admin-only channel for important decisions and high-level management.",
+    "joins":             "📥 Member join logs are recorded here automatically.",
+    "leaves":            "📤 Member leave logs are recorded here automatically.",
+    "private-bot-cmds":  "🤖 Private channel for owner bot commands only.",
 }
 
 # =========================
@@ -95,16 +80,13 @@ def keep_alive():
 
 # =========================
 # HELPER: SEND BANNER
-# Always sends from repo root banner.png as a fresh File object each time.
-# Discord requires a new File() instance per send — you can't reuse one.
 # =========================
 async def send_banner(channel):
     await channel.send(file=discord.File(BANNER_FILE))
 
 # =========================
-# HELPER: BUILD CHANNEL EMBED
-# Sends banner.png first, then the embed below it as a separate message.
-# This is used for channel setup/updatechan only.
+# HELPER: SEND CHANNEL EMBED
+# Banner first, then embed below it. Used for build and updatechan.
 # =========================
 async def send_channel_embed(channel, channel_key=None):
     if channel_key is None:
@@ -121,23 +103,21 @@ async def send_channel_embed(channel, channel_key=None):
 async def on_ready():
     print(f"Logged in as {bot.user}")
     print("Bot is online.")
-    await bot.tree.sync()  # sync slash commands if any
+    print(f"Guilds: {[g.name for g in bot.guilds]}")
+    print(f"Member intent enabled: {bot.intents.members}")
 
-# =========================
-# MEMBER JOIN
-# =========================
 # =========================
 # MEMBER JOIN
 # =========================
 @bot.event
 async def on_member_join(member):
+    print(f"[JOIN EVENT] {member.name} joined {member.guild.name}")
     guild = member.guild
 
-    # --- WELCOME CHANNEL ---
-    # Banner is already pinned at top from channel setup.
-    # Just send the individual player join embed, no banner here.
+    # WELCOME CHANNEL - no banner, just the player join embed
     welcome_channel = discord.utils.get(guild.text_channels, name="{.Σ}-welcome")
     if welcome_channel:
+        print(f"[JOIN EVENT] Sending to welcome channel")
         embed = discord.Embed(
             title=f"👋 {member.name} just joined!",
             description=(
@@ -156,11 +136,13 @@ async def on_member_join(member):
         embed.timestamp = discord.utils.utcnow()
         await welcome_channel.send(embed=embed)
         await welcome_channel.send(DIVIDER)
+    else:
+        print(f"[JOIN EVENT] Welcome channel not found!")
 
-    # --- JOINS CHANNEL ---
-    # Banner first, then embed below it.
+    # JOINS CHANNEL - banner first then embed
     joins_channel = discord.utils.get(guild.text_channels, name="{.Σ}-joins")
     if joins_channel:
+        print(f"[JOIN EVENT] Sending to joins channel")
         await send_banner(joins_channel)
         embed = discord.Embed(
             title=f"🎉 Welcome to {guild.name}!",
@@ -174,8 +156,10 @@ async def on_member_join(member):
         embed.timestamp = discord.utils.utcnow()
         await joins_channel.send(embed=embed)
         await joins_channel.send(DIVIDER)
+    else:
+        print(f"[JOIN EVENT] Joins channel not found!")
 
-    # --- LOGS CHANNEL ---
+    # LOGS CHANNEL
     logs = discord.utils.get(guild.text_channels, name="{.Σ}-logs")
     if logs:
         embed = discord.Embed(
@@ -194,12 +178,13 @@ async def on_member_join(member):
 # =========================
 @bot.event
 async def on_member_remove(member):
+    print(f"[LEAVE EVENT] {member.name} left {member.guild.name}")
     guild = member.guild
 
-    # --- LEAVES CHANNEL ---
-    # Banner first, then embed below it.
+    # LEAVES CHANNEL - banner first then embed
     leaves_channel = discord.utils.get(guild.text_channels, name="{.Σ}-leaves")
     if leaves_channel:
+        print(f"[LEAVE EVENT] Sending to leaves channel")
         await send_banner(leaves_channel)
         embed = discord.Embed(
             title="👋 A member has left",
@@ -213,8 +198,10 @@ async def on_member_remove(member):
         embed.timestamp = discord.utils.utcnow()
         await leaves_channel.send(embed=embed)
         await leaves_channel.send(DIVIDER)
+    else:
+        print(f"[LEAVE EVENT] Leaves channel not found!")
 
-    # --- LOGS CHANNEL ---
+    # LOGS CHANNEL
     logs = discord.utils.get(guild.text_channels, name="{.Σ}-logs")
     if logs:
         embed = discord.Embed(
@@ -236,7 +223,7 @@ async def on_member_remove(member):
 async def on_message_delete(message):
     if message.author.bot:
         return
-    logs = discord.utils.get(message.guild.channels, name="{.Σ}-logs")
+    logs = discord.utils.get(message.guild.text_channels, name="{.Σ}-logs")
     if logs:
         embed = discord.Embed(
             title="🗑️ Message Deleted",
@@ -250,7 +237,6 @@ async def on_message_delete(message):
 
 # =========================
 # BUILD SERVER COMMAND
-# Builds the full server from scratch based on your exact layout.
 # =========================
 @bot.command()
 @commands.is_owner()
@@ -258,20 +244,19 @@ async def build(ctx):
     guild = ctx.guild
     await ctx.send("⚙️ Building full server setup... this will take a moment.")
 
-    # ===== ROLES =====
     roles_to_create = {
-        "{.Σ} Owner":    discord.Color.red(),
-        "{.Σ} Admin":    discord.Color.dark_red(),
-        "{.Σ} Moderator": discord.Color.orange(),
+        "{.Σ} Owner":      discord.Color.red(),
+        "{.Σ} Admin":      discord.Color.dark_red(),
+        "{.Σ} Moderator":  discord.Color.orange(),
         "{.Σ} Media Team": discord.Color.purple(),
-        "{.Σ} VIP":      discord.Color.gold(),
-        "✅ Verified":   discord.Color.green(),
-        "❌ Unverified": discord.Color.dark_gray(),
-        "🎮 Gamer":      discord.Color.blue(),
+        "{.Σ} VIP":        discord.Color.gold(),
+        "✅ Verified":     discord.Color.green(),
+        "❌ Unverified":   discord.Color.dark_gray(),
+        "🎮 Gamer":        discord.Color.blue(),
         "🎵 Music Addict": discord.Color.magenta(),
-        "😂 Meme Lord":  discord.Color.teal(),
-        "🔥 Active":     discord.Color.brand_red(),
-        "Muted":         discord.Color.dark_grey(),
+        "😂 Meme Lord":    discord.Color.teal(),
+        "🔥 Active":       discord.Color.brand_red(),
+        "Muted":           discord.Color.dark_grey(),
     }
 
     created_roles = {}
@@ -279,17 +264,13 @@ async def build(ctx):
         role = await guild.create_role(name=name, color=color)
         created_roles[name] = role
 
-    owner_r    = created_roles["{.Σ} Owner"]
-    admin_r    = created_roles["{.Σ} Admin"]
-    mod_r      = created_roles["{.Σ} Moderator"]
-    verified_r = created_roles["✅ Verified"]
+    owner_r      = created_roles["{.Σ} Owner"]
+    admin_r      = created_roles["{.Σ} Admin"]
+    mod_r        = created_roles["{.Σ} Moderator"]
+    verified_r   = created_roles["✅ Verified"]
     unverified_r = created_roles["❌ Unverified"]
+    ev           = guild.default_role
 
-    ev = guild.default_role  # @everyone shorthand
-
-    # =========================
-    # HELPER: permission overwrites builder
-    # =========================
     def ow(read=None, send=None, history=None):
         return discord.PermissionOverwrite(
             read_messages=read,
@@ -297,8 +278,8 @@ async def build(ctx):
             read_message_history=history
         )
 
-    # ===== VERIFICATION CATEGORY =====
-    verify_cat_ow = {
+    # VERIFICATION
+    verify_ow = {
         ev:           ow(read=False, history=False),
         unverified_r: ow(read=True, send=True, history=True),
         verified_r:   ow(read=False, history=False),
@@ -306,52 +287,47 @@ async def build(ctx):
         admin_r:      ow(read=True, send=True, history=True),
         owner_r:      ow(read=True, send=True, history=True),
     }
-    verify_cat = await guild.create_category("{.Σ} ───── VERIFICATION ─────", overwrites=verify_cat_ow)
+    verify_cat = await guild.create_category("{.Σ} ───── VERIFICATION ─────", overwrites=verify_ow)
+    ch = await guild.create_text_channel("{.Σ}-verification", category=verify_cat, overwrites=verify_ow)
+    await send_channel_embed(ch, "verification")
 
-    verify_ch = await guild.create_text_channel("{.Σ}-verification", category=verify_cat, overwrites=verify_cat_ow)
-    await send_channel_embed(verify_ch, "verification")
-
-    logs_cat_ow = {
+    logs_ow = {
         ev:      ow(read=False, history=False),
         mod_r:   ow(read=True, send=True, history=True),
         admin_r: ow(read=True, send=True, history=True),
         owner_r: ow(read=True, send=True, history=True),
     }
-    logs_cat = await guild.create_category("{.Σ} ───── LOGS ─────", overwrites=logs_cat_ow)
-    logs_ch = await guild.create_text_channel("{.Σ}-logs", category=logs_cat, overwrites=logs_cat_ow)
+    logs_cat = await guild.create_category("{.Σ} ───── LOGS ─────", overwrites=logs_ow)
+    await guild.create_text_channel("{.Σ}-logs", category=logs_cat, overwrites=logs_ow)
 
-    # ===== INFORMATION CATEGORY =====
-    # Verified can read but not send. Staff can do both.
-    info_cat_ow = {
+    # INFORMATION
+    info_ow = {
         ev:        ow(read=False, send=False, history=False),
         verified_r: ow(read=True, send=False, history=True),
         mod_r:     ow(read=True, send=True, history=True),
         admin_r:   ow(read=True, send=True, history=True),
         owner_r:   ow(read=True, send=True, history=True),
     }
-    info_cat = await guild.create_category("{.Σ} ───── INFORMATION ─────", overwrites=info_cat_ow)
+    info_cat = await guild.create_category("{.Σ} ───── INFORMATION ─────", overwrites=info_ow)
     for ch_name in ["welcome", "rules", "announcements", "updates"]:
-        ch = await guild.create_text_channel(f"{{.Σ}}-{ch_name}", category=info_cat, overwrites=info_cat_ow)
+        ch = await guild.create_text_channel(f"{{.Σ}}-{ch_name}", category=info_cat, overwrites=info_ow)
         await send_channel_embed(ch, ch_name)
 
-    # ===== LINKS CATEGORY =====
-    # Verified can read but not send. Staff can do both.
-    links_cat_ow = {
+    # LINKS
+    links_ow = {
         ev:        ow(read=False, send=False, history=False),
         verified_r: ow(read=True, send=False, history=True),
         mod_r:     ow(read=True, send=True, history=True),
         admin_r:   ow(read=True, send=True, history=True),
         owner_r:   ow(read=True, send=True, history=True),
     }
-    links_cat = await guild.create_category("{.Σ} ───── LINKS ─────", overwrites=links_cat_ow)
+    links_cat = await guild.create_category("{.Σ} ───── LINKS ─────", overwrites=links_ow)
     for ch_name in ["roblox-group", "game-links", "my-profile", "youtube-links"]:
-        ch = await guild.create_text_channel(f"{{.Σ}}-{ch_name}", category=links_cat, overwrites=links_cat_ow)
+        ch = await guild.create_text_channel(f"{{.Σ}}-{ch_name}", category=links_cat, overwrites=links_ow)
         await send_channel_embed(ch, ch_name)
 
-    # ===== COMMUNITY CATEGORY =====
-    # Verified can read AND send. Staff can do both.
-    # hall-of-shame and bot-commands: verified can read but not send.
-    community_cat_ow = {
+    # COMMUNITY
+    community_ow = {
         ev:        ow(read=False, history=False),
         verified_r: ow(read=True, send=True, history=True),
         mod_r:     ow(read=True, send=True, history=True),
@@ -365,48 +341,47 @@ async def build(ctx):
         admin_r:   ow(read=True, send=True, history=True),
         owner_r:   ow(read=True, send=True, history=True),
     }
-    community_cat = await guild.create_category("{.Σ} ───── COMMUNITY ─────", overwrites=community_cat_ow)
+    community_cat = await guild.create_category("{.Σ} ───── COMMUNITY ─────", overwrites=community_ow)
     for ch_name in ["general", "memes", "polls", "questions", "community-codes"]:
-        ch = await guild.create_text_channel(f"{{.Σ}}-{ch_name}", category=community_cat, overwrites=community_cat_ow)
+        ch = await guild.create_text_channel(f"{{.Σ}}-{ch_name}", category=community_cat, overwrites=community_ow)
         await send_channel_embed(ch, ch_name)
     for ch_name in ["hall-of-shame", "bot-commands"]:
         ch = await guild.create_text_channel(f"{{.Σ}}-{ch_name}", category=community_cat, overwrites=community_readonly_ow)
         await send_channel_embed(ch, ch_name)
 
-    # ===== GAMING CATEGORY =====
-    gaming_cat_ow = {
+    # GAMING
+    gaming_ow = {
         ev:        ow(read=False, history=False),
         verified_r: ow(read=True, send=True, history=True),
         mod_r:     ow(read=True, send=True, history=True),
         admin_r:   ow(read=True, send=True, history=True),
         owner_r:   ow(read=True, send=True, history=True),
     }
-    gaming_cat = await guild.create_category("{.Σ} ───── GAMING ─────", overwrites=gaming_cat_ow)
+    gaming_cat = await guild.create_category("{.Σ} ───── GAMING ─────", overwrites=gaming_ow)
     for ch_name in ["roblox-chat", "game-suggestions", "looking-to-play"]:
-        ch = await guild.create_text_channel(f"{{.Σ}}-{ch_name}", category=gaming_cat, overwrites=gaming_cat_ow)
+        ch = await guild.create_text_channel(f"{{.Σ}}-{ch_name}", category=gaming_cat, overwrites=gaming_ow)
         await send_channel_embed(ch, ch_name)
 
-    # ===== MEDIA ZONE CATEGORY =====
-    media_cat_ow = {
+    # MEDIA ZONE
+    media_ow = {
         ev:        ow(read=False, history=False),
         verified_r: ow(read=True, send=True, history=True),
         mod_r:     ow(read=True, send=True, history=True),
         admin_r:   ow(read=True, send=True, history=True),
         owner_r:   ow(read=True, send=True, history=True),
     }
-    media_cat = await guild.create_category("{.Σ} ───── MEDIA ZONE ─────", overwrites=media_cat_ow)
+    media_cat = await guild.create_category("{.Σ} ───── MEDIA ZONE ─────", overwrites=media_ow)
     for ch_name in ["photos", "videos", "clips", "artwork", "music", "selfies", "edits", "stream-highlights"]:
-        ch = await guild.create_text_channel(f"{{.Σ}}-{ch_name}", category=media_cat, overwrites=media_cat_ow)
+        ch = await guild.create_text_channel(f"{{.Σ}}-{ch_name}", category=media_cat, overwrites=media_ow)
         await send_channel_embed(ch, ch_name)
 
-    # ===== STAFF CATEGORY =====
-    staff_cat_ow = {
+    # STAFF
+    staff_ow = {
         ev:      ow(read=False, history=False),
         mod_r:   ow(read=True, send=True, history=True),
         admin_r: ow(read=True, send=True, history=True),
         owner_r: ow(read=True, send=True, history=True),
     }
-    # joins/leaves: verified can read (read-only)
     staff_visible_ow = {
         ev:        ow(read=False, history=False),
         verified_r: ow(read=True, send=False, history=True),
@@ -414,9 +389,9 @@ async def build(ctx):
         admin_r:   ow(read=True, send=True, history=True),
         owner_r:   ow(read=True, send=True, history=True),
     }
-    staff_cat = await guild.create_category("{.Σ} ───── STAFF ─────", overwrites=staff_cat_ow)
+    staff_cat = await guild.create_category("{.Σ} ───── STAFF ─────", overwrites=staff_ow)
     for ch_name in ["staff-chat", "mod-logs", "admin-only", "private-bot-cmds"]:
-        ch = await guild.create_text_channel(f"{{.Σ}}-{ch_name}", category=staff_cat, overwrites=staff_cat_ow)
+        ch = await guild.create_text_channel(f"{{.Σ}}-{ch_name}", category=staff_cat, overwrites=staff_ow)
         await send_channel_embed(ch, ch_name)
     for ch_name in ["joins", "leaves"]:
         ch = await guild.create_text_channel(f"{{.Σ}}-{ch_name}", category=staff_cat, overwrites=staff_visible_ow)
@@ -453,36 +428,23 @@ async def wipe(ctx):
                 await role.delete()
             except:
                 pass
-
     await ctx.send("💀 Server wiped.")
 
 # =========================
 # UPDATE CHANNEL COMMAND
-# Wipes a channel and resends whatever is currently defined for it in
-# CHANNEL_EMBEDS (and any extra messages below). So when you update the
-# script and redeploy, run !updatechan #channel to push the changes live.
-# Usage: !updatechan #channel-name
 # =========================
 @bot.command()
 @commands.is_owner()
 async def updatechan(ctx, channel: discord.TextChannel):
     msg = await ctx.send(f"🔄 Updating {channel.mention}...")
     try:
-        # Wipe everything in the channel
         deleted = await channel.purge(limit=None)
-
-        # Sync permissions back to category in case those changed too
         if channel.category:
             await channel.edit(sync_permissions=True)
-
-        # Get the channel key (strip {.Σ}- prefix)
         ch_key = channel.name.replace("{.Σ}-", "").replace("{.σ}-", "")
-
         if ch_key not in CHANNEL_EMBEDS:
-            await msg.edit(content=f"⚠️ Cleared {channel.mention} ({len(deleted)} messages) but `{ch_key}` has no entry in CHANNEL_EMBEDS. Add it to the script first.")
+            await msg.edit(content=f"⚠️ Cleared {channel.mention} ({len(deleted)} messages) but `{ch_key}` has no entry in CHANNEL_EMBEDS.")
             return
-
-        # Resend the current content from the script
         await send_channel_embed(channel, ch_key)
         await msg.edit(content=f"✅ {channel.mention} updated! ({len(deleted)} old messages cleared)")
     except Exception as e:
@@ -490,7 +452,6 @@ async def updatechan(ctx, channel: discord.TextChannel):
 
 # =========================
 # FIX PERMISSIONS COMMAND
-# Usage: !fixperms #channel | !fixperms category_name | !fixperms all
 # =========================
 @bot.command()
 @commands.is_owner()
@@ -500,8 +461,6 @@ async def fixperms(ctx, *, target=None):
         return
 
     unverified_r = discord.utils.get(ctx.guild.roles, name="❌ Unverified")
-    verified_r   = discord.utils.get(ctx.guild.roles, name="✅ Verified")
-
     if not unverified_r:
         await ctx.send("❌ Could not find '❌ Unverified' role!")
         return
@@ -573,7 +532,6 @@ async def scan(ctx):
     for cat in guild.categories:
         output.append(f"\n📂 CATEGORY: {cat.name}")
         output.append(f"   ID: {cat.id} | Position: {cat.position}")
-        output.append(f"   PERMISSIONS:")
         for t, ow in cat.overwrites.items():
             perms = [f"{p}: {v}" for p, v in ow if v is not None]
             output.append(f"      {t.name}: {', '.join(perms)}")
@@ -610,8 +568,7 @@ async def scan(ctx):
     with open(filename, "w", encoding="utf-8") as f:
         f.write("\n".join(output))
 
-    private_ch = discord.utils.get(guild.text_channels, name="private-bot-cmds") or \
-                 discord.utils.get(guild.text_channels, name="{.Σ}-private-bot-cmds")
+    private_ch = discord.utils.get(guild.text_channels, name="{.Σ}-private-bot-cmds")
     target_ch = private_ch or ctx.channel
     await target_ch.send(f"✅ Scan complete! {len(output)} lines.", file=discord.File(filename))
     if private_ch and private_ch != ctx.channel:
@@ -714,7 +671,6 @@ async def ping(ctx):
 
 # =========================
 # BOTCOMMANDS
-# (renamed from 'commands' to avoid shadowing discord.ext.commands)
 # =========================
 @bot.command()
 async def botcommands(ctx):
@@ -746,18 +702,14 @@ async def botcommands(ctx):
 @bot.command()
 @commands.is_owner()
 async def testjoin(ctx):
-    """Simulate a member joining by firing the actual event with your own member object."""
-    await ctx.message.delete()
-    bot.dispatch("member_join", ctx.author)
-    await ctx.send("✅ Dispatched join event!", delete_after=5)
+    await on_member_join(ctx.author)
+    await ctx.send("✅ Simulated join event!")
 
 @bot.command()
 @commands.is_owner()
 async def testleave(ctx):
-    """Simulate a member leaving by firing the actual event with your own member object."""
-    await ctx.message.delete()
-    bot.dispatch("member_remove", ctx.author)
-    await ctx.send("✅ Dispatched leave event!", delete_after=5)
+    await on_member_remove(ctx.author)
+    await ctx.send("✅ Simulated leave event!")
 
 # =========================
 # SHUTDOWN
