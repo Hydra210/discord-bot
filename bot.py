@@ -4,6 +4,7 @@ from flask import Flask
 from threading import Thread
 import os
 import asyncio
+import aiohttp
 
 # =========================
 # TOKEN FROM RENDER ENV
@@ -120,6 +121,134 @@ def keep_alive():
     t.start()
 
 # =========================
+# ROBLOX API HELPERS
+# =========================
+async def fetch_roblox_game(universe_id):
+    """Fetch game details from Roblox Games API."""
+    url = f"https://games.roblox.com/v1/games?universeIds={universe_id}"
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url) as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    games = data.get("data", [])
+                    return games[0] if games else None
+    except Exception as e:
+        print(f"[Roblox API] fetch_roblox_game error: {e}")
+    return None
+
+async def fetch_roblox_thumbnail(universe_id):
+    """Fetch game thumbnail URL from Roblox Thumbnails API."""
+    url = (
+        f"https://thumbnails.roblox.com/v1/games/icons"
+        f"?universeIds={universe_id}&returnPolicy=PlaceHolder&size=512x512&format=Png&isCircular=false"
+    )
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url) as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    items = data.get("data", [])
+                    if items:
+                        return items[0].get("imageUrl")
+    except Exception as e:
+        print(f"[Roblox API] fetch_roblox_thumbnail error: {e}")
+    return None
+
+async def fetch_roblox_game_banner(universe_id):
+    """Fetch game banner/thumbnail URL (large) from Roblox Thumbnails API."""
+    url = (
+        f"https://thumbnails.roblox.com/v1/games/game-thumbnails"
+        f"?universeIds={universe_id}&countPerUniverse=1&defaults=true&size=768x432&format=Png&isCircular=false"
+    )
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url) as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    items = data.get("data", [])
+                    if items:
+                        thumbnails = items[0].get("thumbnails", [])
+                        if thumbnails:
+                            return thumbnails[0].get("imageUrl")
+    except Exception as e:
+        print(f"[Roblox API] fetch_roblox_game_banner error: {e}")
+    return None
+
+async def fetch_universe_id(place_id):
+    """Convert a Roblox place ID to a universe ID."""
+    url = f"https://apis.roblox.com/universes/v1/places/{place_id}/universe"
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url) as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    return data.get("universeId")
+    except Exception as e:
+        print(f"[Roblox API] fetch_universe_id error: {e}")
+    return None
+
+async def fetch_roblox_user(user_id):
+    """Fetch a Roblox user's profile info."""
+    url = f"https://users.roblox.com/v1/users/{user_id}"
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url) as resp:
+                if resp.status == 200:
+                    return await resp.json()
+    except Exception as e:
+        print(f"[Roblox API] fetch_roblox_user error: {e}")
+    return None
+
+async def fetch_roblox_avatar(user_id):
+    """Fetch a Roblox user's avatar headshot URL."""
+    url = (
+        f"https://thumbnails.roblox.com/v1/users/avatar-headshot"
+        f"?userIds={user_id}&size=420x420&format=Png&isCircular=false"
+    )
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url) as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    items = data.get("data", [])
+                    if items:
+                        return items[0].get("imageUrl")
+    except Exception as e:
+        print(f"[Roblox API] fetch_roblox_avatar error: {e}")
+    return None
+
+async def fetch_roblox_group(group_id):
+    """Fetch a Roblox group's info."""
+    url = f"https://groups.roblox.com/v1/groups/{group_id}"
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url) as resp:
+                if resp.status == 200:
+                    return await resp.json()
+    except Exception as e:
+        print(f"[Roblox API] fetch_roblox_group error: {e}")
+    return None
+
+async def fetch_roblox_group_icon(group_id):
+    """Fetch a Roblox group's icon URL."""
+    url = (
+        f"https://thumbnails.roblox.com/v1/groups/icons"
+        f"?groupIds={group_id}&size=420x420&format=Png&isCircular=false"
+    )
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url) as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    items = data.get("data", [])
+                    if items:
+                        return items[0].get("imageUrl")
+    except Exception as e:
+        print(f"[Roblox API] fetch_roblox_group_icon error: {e}")
+    return None
+
+# =========================
 # HELPER: SEND BANNER
 # =========================
 async def send_banner(channel):
@@ -127,15 +256,118 @@ async def send_banner(channel):
 
 # =========================
 # HELPER: SEND CHANNEL EMBED
-# Banner first, then embed below it.
+# Handles generic channels AND special Roblox-rich channels.
 # =========================
 async def send_channel_embed(channel, channel_key=None):
     if channel_key is None:
         channel_key = channel.name
+
     description = CHANNEL_EMBEDS.get(channel_key, f"Welcome to {channel.name}. Keep it clean and follow the rules.")
-    await send_banner(channel)
-    embed = discord.Embed(description=description, color=EMBED_COLOR)
-    await channel.send(embed=embed)
+
+    # Send banner first
+    try:
+        await send_banner(channel)
+    except FileNotFoundError:
+        pass
+
+    # ── RULES ──
+    if channel_key == "rules":
+        embed = discord.Embed(description=description, color=EMBED_COLOR)
+        await channel.send(embed=embed)
+
+    # ── GAME LINKS ──
+    elif channel_key == "game-links":
+        embed = discord.Embed(description=description, color=EMBED_COLOR)
+        await channel.send(embed=embed)
+
+        # Game 1 — Patrick's Boombox Hangout (universe ID directly)
+        game1 = await fetch_roblox_game("9485321544")
+        thumb1 = await fetch_roblox_thumbnail("9485321544")
+        banner1 = await fetch_roblox_game_banner("9485321544")
+        if game1:
+            e1 = discord.Embed(
+                title=game1.get("name", "Unknown Game"),
+                description=game1.get("description", "No description available."),
+                url=f"https://www.roblox.com/games/{game1.get('rootPlaceId', '')}",
+                color=EMBED_COLOR
+            )
+            e1.add_field(name="👥 Active Players", value=f"{game1.get('playing', 0):,}", inline=True)
+            e1.add_field(name="👁️ Visits",         value=f"{game1.get('visits', 0):,}", inline=True)
+            e1.add_field(name="👍 Favorites",       value=f"{game1.get('favoritedCount', 0):,}", inline=True)
+            if thumb1:
+                e1.set_thumbnail(url=thumb1)
+            if banner1:
+                e1.set_image(url=banner1)
+            e1.set_footer(text="Roblox Game")
+            await channel.send(embed=e1)
+
+        # Game 2 — Custom Boombox Lab (place ID → universe ID)
+        universe2 = await fetch_universe_id("117291932416578")
+        if universe2:
+            game2  = await fetch_roblox_game(universe2)
+            thumb2 = await fetch_roblox_thumbnail(universe2)
+            banner2 = await fetch_roblox_game_banner(universe2)
+            if game2:
+                e2 = discord.Embed(
+                    title=game2.get("name", "Unknown Game"),
+                    description=game2.get("description", "No description available."),
+                    url="https://www.roblox.com/games/117291932416578/Custom-Boombox-Lab",
+                    color=EMBED_COLOR
+                )
+                e2.add_field(name="👥 Active Players", value=f"{game2.get('playing', 0):,}", inline=True)
+                e2.add_field(name="👁️ Visits",         value=f"{game2.get('visits', 0):,}", inline=True)
+                e2.add_field(name="👍 Favorites",       value=f"{game2.get('favoritedCount', 0):,}", inline=True)
+                if thumb2:
+                    e2.set_thumbnail(url=thumb2)
+                if banner2:
+                    e2.set_image(url=banner2)
+                e2.set_footer(text="Roblox Game")
+                await channel.send(embed=e2)
+
+    # ── MY PROFILE ──
+    elif channel_key == "my-profile":
+        embed = discord.Embed(description=description, color=EMBED_COLOR)
+        await channel.send(embed=embed)
+
+        user   = await fetch_roblox_user("1230783705")
+        avatar = await fetch_roblox_avatar("1230783705")
+        if user:
+            profile_embed = discord.Embed(
+                title=user.get("displayName", "Unknown"),
+                description=user.get("description", "No bio available."),
+                url="https://www.roblox.com/users/1230783705/profile",
+                color=EMBED_COLOR
+            )
+            profile_embed.add_field(name="Username", value=f"@{user.get('name', 'Unknown')}", inline=True)
+            if avatar:
+                profile_embed.set_thumbnail(url=avatar)
+            profile_embed.set_footer(text="Roblox Profile")
+            await channel.send(embed=profile_embed)
+
+    # ── ROBLOX GROUP ──
+    elif channel_key == "roblox-group":
+        embed = discord.Embed(description=description, color=EMBED_COLOR)
+        await channel.send(embed=embed)
+
+        group = await fetch_roblox_group("56408124")
+        icon  = await fetch_roblox_group_icon("56408124")
+        if group:
+            group_embed = discord.Embed(
+                title=group.get("name", "Unknown Group"),
+                description=group.get("description", "No description available."),
+                url="https://www.roblox.com/communities/56408124/EXE-Audios",
+                color=EMBED_COLOR
+            )
+            group_embed.add_field(name="👥 Members", value=f"{group.get('memberCount', 0):,}", inline=True)
+            if icon:
+                group_embed.set_thumbnail(url=icon)
+            group_embed.set_footer(text="Roblox Group")
+            await channel.send(embed=group_embed)
+
+    # ── ALL OTHER CHANNELS ──
+    else:
+        embed = discord.Embed(description=description, color=EMBED_COLOR)
+        await channel.send(embed=embed)
 
 # =========================
 # READY EVENT
@@ -390,7 +622,7 @@ async def build(ctx):
         ch = await guild.create_text_channel(ch_name, category=community_cat, overwrites=community_readonly_ow)
         await send_channel_embed(ch, ch_name)
 
-    # SUPPORT (formerly GAMING) - includes suggestions forum
+    # SUPPORT
     support_ow = {
         ev:         ow(read=False, history=False),
         verified_r: ow(read=True, send=True, history=True),
@@ -400,13 +632,11 @@ async def build(ctx):
     }
     support_cat = await guild.create_category("{.Σ} ───── SUPPORT ─────", overwrites=support_ow)
 
-    # Regular support channels
     for ch_name in ["roblox-chat", "looking-to-play"]:
         ch = await guild.create_text_channel(ch_name, category=support_cat, overwrites=support_ow)
         await send_channel_embed(ch, ch_name)
 
     # Suggestions forum channel
-    # Unverified can see but not post. Everyone else can post.
     suggestions_ow = {
         ev:           discord.PermissionOverwrite(
             read_messages=False,
@@ -469,12 +699,10 @@ async def build(ctx):
             discord.ForumTag(name="👀 Under Review"),
         ]
     )
-
-    # Post the format guide as the first thread in the forum
     await suggestions_ch.create_thread(
         name="📋 READ BEFORE POSTING — Suggestion Format Guide",
         content=SUGGESTIONS_GUIDE,
-        auto_archive_duration=10080,  # 7 days
+        auto_archive_duration=10080,
     )
 
     # MEDIA ZONE
@@ -826,12 +1054,8 @@ async def shutdown(ctx):
     await bot.close()
 
 # =========================
-# START
+# BB — BUILD MISSING CHANNELS
 # =========================
-keep_alive()
-bot.run(TOKEN)
-
-
 @bot.command()
 @commands.is_owner()
 async def bb(ctx):
@@ -839,10 +1063,8 @@ async def bb(ctx):
     guild = ctx.guild
     msg = await ctx.send("🔍 Checking for missing channels...")
 
-    # Get all current channel names
     existing = {ch.name for ch in guild.channels}
 
-    # Get roles
     owner_r      = discord.utils.get(guild.roles, name="{.Σ} Owner")
     admin_r      = discord.utils.get(guild.roles, name="{.Σ} Admin")
     mod_r        = discord.utils.get(guild.roles, name="{.Σ} Moderator")
@@ -861,14 +1083,12 @@ async def bb(ctx):
             read_message_history=history
         )
 
-    # Helper to get or create a category by name
     async def get_or_create_category(name, overwrites):
         cat = discord.utils.get(guild.categories, name=name)
         if not cat:
             cat = await guild.create_category(name, overwrites=overwrites)
         return cat
 
-    # Helper to build a missing text channel
     async def maybe_create(name, category, overwrites, key=None):
         if name not in existing:
             ch = await guild.create_text_channel(name, category=category, overwrites=overwrites)
@@ -1016,3 +1236,9 @@ async def bb(ctx):
         await msg.edit(content=f"✅ Built {len(created)} missing channel(s): {', '.join(f'`{c}`' for c in created)}")
     else:
         await msg.edit(content="✅ All channels already exist, nothing to build!")
+
+# =========================
+# START
+# =========================
+keep_alive()
+bot.run(TOKEN)
