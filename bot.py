@@ -59,7 +59,7 @@ CHANNEL_EMBEDS = {
 }
 
 # Suggestions forum format guide shown as the first post in the forum
-SUGGESTIONS_GUIDE = """📋 **HOW TO POST A SUGGESTION**
+SUGGESTIONS_GUIDE = """ **📌 READ BEFORE POSTING — FORMAT**
 
 Before posting, make sure your suggestion follows this format:
 
@@ -76,19 +76,18 @@ Any examples, references, or screenshots that help explain your idea.
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-✅ **DO:**
+ **DO:**
 - Be specific and detailed
 - Keep it respectful and constructive
 - Check if your suggestion already exists before posting
-- React with 👍 or 👎 on suggestions you agree or disagree with
 
-❌ **DON'T:**
+ **DON'T:**
 - Post duplicate suggestions
 - Be rude or dismissive of others' ideas
 - Post anything unrelated to the server or community
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-All suggestions are reviewed by staff. We appreciate every idea! 💜"""
+All suggestions are reviewed by staff. We appreciate every idea! """
 
 # =========================
 # HELPER: FIND CHANNEL BY NAME
@@ -1469,3 +1468,4 @@ async def bb(ctx):
 # =========================
 keep_alive()
 bot.run(TOKEN)
+
