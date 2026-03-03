@@ -1054,132 +1054,135 @@ async def shutdown(ctx):
     await bot.close()
 
 # =========================
-# BB — BUILD MISSING CHANNELS
+# BB — INTERACTIVE MISSING CHANNEL BUILDER
 # =========================
-@bot.command()
-@commands.is_owner()
-async def bb(ctx):
-    """Build any missing channels that don't exist yet without touching existing ones."""
-    guild = ctx.guild
-    msg = await ctx.send("🔍 Checking for missing channels...")
 
-    existing = {ch.name for ch in guild.channels}
+# Number emojis for up to 10 slots
+BB_EMOJIS = ["1️⃣","2️⃣","3️⃣","4️⃣","5️⃣","6️⃣","7️⃣","8️⃣","9️⃣","🔟"]
 
-    owner_r      = discord.utils.get(guild.roles, name="{.Σ} Owner")
-    admin_r      = discord.utils.get(guild.roles, name="{.Σ} Admin")
-    mod_r        = discord.utils.get(guild.roles, name="{.Σ} Moderator")
-    verified_r   = discord.utils.get(guild.roles, name="✅ Verified")
-    unverified_r = discord.utils.get(guild.roles, name="❌ Unverified")
-    ev           = guild.default_role
+# Master ordered list: (channel_name, category_display_name, overwrite_type)
+# overwrite_type key: "verify"|"logs"|"info"|"links"|"community"|"community_ro"|"support"|"suggestions"|"media"|"staff"
+BB_CHANNEL_LIST = [
+    ("verification",     "{.Σ} ───── VERIFICATION ─────", "verify"),
+    ("logs",             "{.Σ} ───── LOGS ─────",         "logs"),
+    ("welcome",          "{.Σ} ───── INFORMATION ─────",  "info"),
+    ("rules",            "{.Σ} ───── INFORMATION ─────",  "info"),
+    ("announcements",    "{.Σ} ───── INFORMATION ─────",  "info"),
+    ("updates",          "{.Σ} ───── INFORMATION ─────",  "info"),
+    ("roblox-group",     "{.Σ} ───── LINKS ─────",        "links"),
+    ("game-links",       "{.Σ} ───── LINKS ─────",        "links"),
+    ("my-profile",       "{.Σ} ───── LINKS ─────",        "links"),
+    ("youtube-links",    "{.Σ} ───── LINKS ─────",        "links"),
+    ("general",          "{.Σ} ───── COMMUNITY ─────",    "community"),
+    ("memes",            "{.Σ} ───── COMMUNITY ─────",    "community"),
+    ("polls",            "{.Σ} ───── COMMUNITY ─────",    "community"),
+    ("questions",        "{.Σ} ───── COMMUNITY ─────",    "community"),
+    ("community-codes",  "{.Σ} ───── COMMUNITY ─────",    "community"),
+    ("joins",            "{.Σ} ───── COMMUNITY ─────",    "community"),
+    ("leaves",           "{.Σ} ───── COMMUNITY ─────",    "community"),
+    ("hall-of-shame",    "{.Σ} ───── COMMUNITY ─────",    "community_ro"),
+    ("bot-commands",     "{.Σ} ───── COMMUNITY ─────",    "community_ro"),
+    ("roblox-chat",      "{.Σ} ───── SUPPORT ─────",      "support"),
+    ("looking-to-play",  "{.Σ} ───── SUPPORT ─────",      "support"),
+    ("suggestions",      "{.Σ} ───── SUPPORT ─────",      "suggestions"),
+    ("photos",           "{.Σ} ───── MEDIA ZONE ─────",   "media"),
+    ("videos",           "{.Σ} ───── MEDIA ZONE ─────",   "media"),
+    ("clips",            "{.Σ} ───── MEDIA ZONE ─────",   "media"),
+    ("artwork",          "{.Σ} ───── MEDIA ZONE ─────",   "media"),
+    ("music",            "{.Σ} ───── MEDIA ZONE ─────",   "media"),
+    ("selfies",          "{.Σ} ───── MEDIA ZONE ─────",   "media"),
+    ("edits",            "{.Σ} ───── MEDIA ZONE ─────",   "media"),
+    ("stream-highlights","{.Σ} ───── MEDIA ZONE ─────",   "media"),
+    ("staff-chat",       "{.Σ} ───── STAFF ─────",        "staff"),
+    ("mod-logs",         "{.Σ} ───── STAFF ─────",        "staff"),
+    ("admin-only",       "{.Σ} ───── STAFF ─────",        "staff"),
+    ("private-bot-cmds", "{.Σ} ───── STAFF ─────",        "staff"),
+]
 
-    if not all([owner_r, admin_r, mod_r, verified_r, unverified_r]):
-        await msg.edit(content="❌ Missing roles! Run `!build` first to create roles before using `!bb`.")
-        return
+
+async def bb_build_one(guild, ch_name, cat_name, ow_type, roles):
+    """Build a single channel by name. Returns the created channel or None."""
+    owner_r, admin_r, mod_r, verified_r, unverified_r, ev = roles
 
     def ow(read=None, send=None, history=None):
         return discord.PermissionOverwrite(
-            read_messages=read,
-            send_messages=send,
-            read_message_history=history
+            read_messages=read, send_messages=send, read_message_history=history
         )
 
-    async def get_or_create_category(name, overwrites):
-        cat = discord.utils.get(guild.categories, name=name)
-        if not cat:
-            cat = await guild.create_category(name, overwrites=overwrites)
-        return cat
-
-    async def maybe_create(name, category, overwrites, key=None):
-        if name not in existing:
-            ch = await guild.create_text_channel(name, category=category, overwrites=overwrites)
-            await send_channel_embed(ch, key or name)
-            return True
-        return False
-
-    created = []
-
-    # ── VERIFICATION ──
-    verify_ow = {
-        ev:           ow(read=False, history=False),
-        unverified_r: ow(read=True, send=True, history=True),
-        verified_r:   ow(read=False, history=False),
-        mod_r:        ow(read=True, send=True, history=True),
-        admin_r:      ow(read=True, send=True, history=True),
-        owner_r:      ow(read=True, send=True, history=True),
+    # Build overwrite dicts per type
+    overwrites = {
+        "verify": {
+            ev: ow(read=False, history=False),
+            unverified_r: ow(read=True, send=True, history=True),
+            verified_r:   ow(read=False, history=False),
+            mod_r:        ow(read=True, send=True, history=True),
+            admin_r:      ow(read=True, send=True, history=True),
+            owner_r:      ow(read=True, send=True, history=True),
+        },
+        "logs": {
+            ev:      ow(read=False, history=False),
+            mod_r:   ow(read=True, send=True, history=True),
+            admin_r: ow(read=True, send=True, history=True),
+            owner_r: ow(read=True, send=True, history=True),
+        },
+        "info": {
+            ev:         ow(read=False, send=False, history=False),
+            verified_r: ow(read=True, send=False, history=True),
+            mod_r:      ow(read=True, send=True, history=True),
+            admin_r:    ow(read=True, send=True, history=True),
+            owner_r:    ow(read=True, send=True, history=True),
+        },
+        "links": {
+            ev:         ow(read=False, send=False, history=False),
+            verified_r: ow(read=True, send=False, history=True),
+            mod_r:      ow(read=True, send=True, history=True),
+            admin_r:    ow(read=True, send=True, history=True),
+            owner_r:    ow(read=True, send=True, history=True),
+        },
+        "community": {
+            ev:         ow(read=False, history=False),
+            verified_r: ow(read=True, send=True, history=True),
+            mod_r:      ow(read=True, send=True, history=True),
+            admin_r:    ow(read=True, send=True, history=True),
+            owner_r:    ow(read=True, send=True, history=True),
+        },
+        "community_ro": {
+            ev:         ow(read=False, send=False, history=False),
+            verified_r: ow(read=True, send=False, history=True),
+            mod_r:      ow(read=True, send=True, history=True),
+            admin_r:    ow(read=True, send=True, history=True),
+            owner_r:    ow(read=True, send=True, history=True),
+        },
+        "support": {
+            ev:         ow(read=False, history=False),
+            verified_r: ow(read=True, send=True, history=True),
+            mod_r:      ow(read=True, send=True, history=True),
+            admin_r:    ow(read=True, send=True, history=True),
+            owner_r:    ow(read=True, send=True, history=True),
+        },
+        "media": {
+            ev:         ow(read=False, history=False),
+            verified_r: ow(read=True, send=True, history=True),
+            mod_r:      ow(read=True, send=True, history=True),
+            admin_r:    ow(read=True, send=True, history=True),
+            owner_r:    ow(read=True, send=True, history=True),
+        },
+        "staff": {
+            ev:      ow(read=False, history=False),
+            mod_r:   ow(read=True, send=True, history=True),
+            admin_r: ow(read=True, send=True, history=True),
+            owner_r: ow(read=True, send=True, history=True),
+        },
     }
-    verify_cat = await get_or_create_category("{.Σ} ───── VERIFICATION ─────", verify_ow)
-    if await maybe_create("verification", verify_cat, verify_ow): created.append("verification")
 
-    # ── LOGS ──
-    logs_ow = {
-        ev:      ow(read=False, history=False),
-        mod_r:   ow(read=True, send=True, history=True),
-        admin_r: ow(read=True, send=True, history=True),
-        owner_r: ow(read=True, send=True, history=True),
-    }
-    logs_cat = await get_or_create_category("{.Σ} ───── LOGS ─────", logs_ow)
-    if await maybe_create("logs", logs_cat, logs_ow): created.append("logs")
+    # Get or create the category
+    cat = discord.utils.get(guild.categories, name=cat_name)
+    if not cat:
+        cat = await guild.create_category(cat_name, overwrites=overwrites.get(ow_type, {}))
 
-    # ── INFORMATION ──
-    info_ow = {
-        ev:         ow(read=False, send=False, history=False),
-        verified_r: ow(read=True, send=False, history=True),
-        mod_r:      ow(read=True, send=True, history=True),
-        admin_r:    ow(read=True, send=True, history=True),
-        owner_r:    ow(read=True, send=True, history=True),
-    }
-    info_cat = await get_or_create_category("{.Σ} ───── INFORMATION ─────", info_ow)
-    for ch_name in ["welcome", "rules", "announcements", "updates"]:
-        if await maybe_create(ch_name, info_cat, info_ow): created.append(ch_name)
-
-    # ── LINKS ──
-    links_ow = {
-        ev:         ow(read=False, send=False, history=False),
-        verified_r: ow(read=True, send=False, history=True),
-        mod_r:      ow(read=True, send=True, history=True),
-        admin_r:    ow(read=True, send=True, history=True),
-        owner_r:    ow(read=True, send=True, history=True),
-    }
-    links_cat = await get_or_create_category("{.Σ} ───── LINKS ─────", links_ow)
-    for ch_name in ["roblox-group", "game-links", "my-profile", "youtube-links"]:
-        if await maybe_create(ch_name, links_cat, links_ow): created.append(ch_name)
-
-    # ── COMMUNITY ──
-    community_ow = {
-        ev:         ow(read=False, history=False),
-        verified_r: ow(read=True, send=True, history=True),
-        mod_r:      ow(read=True, send=True, history=True),
-        admin_r:    ow(read=True, send=True, history=True),
-        owner_r:    ow(read=True, send=True, history=True),
-    }
-    community_readonly_ow = {
-        ev:         ow(read=False, send=False, history=False),
-        verified_r: ow(read=True, send=False, history=True),
-        mod_r:      ow(read=True, send=True, history=True),
-        admin_r:    ow(read=True, send=True, history=True),
-        owner_r:    ow(read=True, send=True, history=True),
-    }
-    community_cat = await get_or_create_category("{.Σ} ───── COMMUNITY ─────", community_ow)
-    for ch_name in ["general", "memes", "polls", "questions", "community-codes", "joins", "leaves"]:
-        if await maybe_create(ch_name, community_cat, community_ow): created.append(ch_name)
-    for ch_name in ["hall-of-shame", "bot-commands"]:
-        if await maybe_create(ch_name, community_cat, community_readonly_ow): created.append(ch_name)
-
-    # ── SUPPORT ──
-    support_ow = {
-        ev:         ow(read=False, history=False),
-        verified_r: ow(read=True, send=True, history=True),
-        mod_r:      ow(read=True, send=True, history=True),
-        admin_r:    ow(read=True, send=True, history=True),
-        owner_r:    ow(read=True, send=True, history=True),
-    }
-    support_cat = await get_or_create_category("{.Σ} ───── SUPPORT ─────", support_ow)
-    for ch_name in ["roblox-chat", "looking-to-play"]:
-        if await maybe_create(ch_name, support_cat, support_ow): created.append(ch_name)
-
-    # Suggestions forum
-    if "suggestions" not in existing:
-        suggestions_ow = {
+    # Special case: suggestions forum
+    if ow_type == "suggestions":
+        sug_ow = {
             ev:           discord.PermissionOverwrite(read_messages=False, read_message_history=False, send_messages=False, create_public_threads=False),
             unverified_r: discord.PermissionOverwrite(read_messages=False, read_message_history=False, send_messages=False, create_public_threads=False),
             verified_r:   discord.PermissionOverwrite(read_messages=True, read_message_history=True, send_messages=True, create_public_threads=True),
@@ -1187,11 +1190,11 @@ async def bb(ctx):
             admin_r:      discord.PermissionOverwrite(read_messages=True, read_message_history=True, send_messages=True, manage_messages=True, manage_threads=True, create_public_threads=True),
             owner_r:      discord.PermissionOverwrite(read_messages=True, read_message_history=True, send_messages=True, manage_messages=True, manage_threads=True, create_public_threads=True),
         }
-        suggestions_ch = await guild.create_forum(
+        forum = await guild.create_forum(
             "suggestions",
-            category=support_cat,
+            category=cat,
             topic="Got an idea? Post it here using the format guide pinned at the top!",
-            overwrites=suggestions_ow,
+            overwrites=sug_ow,
             available_tags=[
                 discord.ForumTag(name="💡 Idea"),
                 discord.ForumTag(name="🎮 Game"),
@@ -1202,40 +1205,249 @@ async def bb(ctx):
                 discord.ForumTag(name="👀 Under Review"),
             ]
         )
-        await suggestions_ch.create_thread(
+        await forum.create_thread(
             name="📋 READ BEFORE POSTING — Suggestion Format Guide",
             content=SUGGESTIONS_GUIDE,
             auto_archive_duration=10080,
         )
-        created.append("suggestions")
+        return forum
 
-    # ── MEDIA ZONE ──
-    media_ow = {
-        ev:         ow(read=False, history=False),
-        verified_r: ow(read=True, send=True, history=True),
-        mod_r:      ow(read=True, send=True, history=True),
-        admin_r:    ow(read=True, send=True, history=True),
-        owner_r:    ow(read=True, send=True, history=True),
-    }
-    media_cat = await get_or_create_category("{.Σ} ───── MEDIA ZONE ─────", media_ow)
-    for ch_name in ["photos", "videos", "clips", "artwork", "music", "selfies", "edits", "stream-highlights"]:
-        if await maybe_create(ch_name, media_cat, media_ow): created.append(ch_name)
+    # Normal text channel
+    ch_ow = overwrites.get(ow_type, {})
+    ch = await guild.create_text_channel(ch_name, category=cat, overwrites=ch_ow)
+    await send_channel_embed(ch, ch_name)
+    return ch
 
-    # ── STAFF ──
-    staff_ow = {
-        ev:      ow(read=False, history=False),
-        mod_r:   ow(read=True, send=True, history=True),
-        admin_r: ow(read=True, send=True, history=True),
-        owner_r: ow(read=True, send=True, history=True),
-    }
-    staff_cat = await get_or_create_category("{.Σ} ───── STAFF ─────", staff_ow)
-    for ch_name in ["staff-chat", "mod-logs", "admin-only", "private-bot-cmds"]:
-        if await maybe_create(ch_name, staff_cat, staff_ow): created.append(ch_name)
 
-    if created:
-        await msg.edit(content=f"✅ Built {len(created)} missing channel(s): {', '.join(f'`{c}`' for c in created)}")
-    else:
-        await msg.edit(content="✅ All channels already exist, nothing to build!")
+def bb_build_embed(missing_page, built_names, total_missing_count):
+    """Build the status embed for the !bb interactive session."""
+    lines = []
+    for i, (ch_name, _, _) in enumerate(missing_page):
+        emoji = BB_EMOJIS[i]
+        if ch_name in built_names:
+            lines.append(f"{emoji} ~~`{ch_name}`~~ ✅")
+        else:
+            lines.append(f"{emoji} `{ch_name}`")
+
+    remaining = len([e for e in missing_page if e[0] not in built_names])
+    description = (
+        f"Found **{total_missing_count}** missing channel(s). Showing up to 10.\n\n"
+        + "\n".join(lines)
+        + f"\n\n{'━'*30}\n"
+        + f"React with the number to build that channel.\n"
+        + f"Type **`All`** in chat to build everything at once.\n"
+        + f"Session times out after **120s** of inactivity."
+    )
+    embed = discord.Embed(
+        title="🔍 Missing Channels",
+        description=description,
+        color=EMBED_COLOR
+    )
+    embed.set_footer(text=f"{remaining} remaining on this page")
+    return embed
+
+
+@bot.command()
+@commands.is_owner()
+async def bb(ctx):
+    """Interactively build missing channels one at a time or all at once."""
+    guild = ctx.guild
+    scanning_msg = await ctx.send("🔍 Scanning for missing channels...")
+
+    # Fetch roles
+    owner_r      = discord.utils.get(guild.roles, name="{.Σ} Owner")
+    admin_r      = discord.utils.get(guild.roles, name="{.Σ} Admin")
+    mod_r        = discord.utils.get(guild.roles, name="{.Σ} Moderator")
+    verified_r   = discord.utils.get(guild.roles, name="✅ Verified")
+    unverified_r = discord.utils.get(guild.roles, name="❌ Unverified")
+    ev           = guild.default_role
+    roles        = (owner_r, admin_r, mod_r, verified_r, unverified_r, ev)
+
+    if not all([owner_r, admin_r, mod_r, verified_r, unverified_r]):
+        await scanning_msg.edit(content="❌ Missing roles! Run `!build` first to create all roles before using `!bb`.")
+        return
+
+    # Find missing channels (up to 10 shown at a time)
+    existing = {ch.name for ch in guild.channels}
+    all_missing = [(ch, cat, owt) for (ch, cat, owt) in BB_CHANNEL_LIST if ch not in existing]
+
+    if not all_missing:
+        await scanning_msg.edit(content="✅ All channels already exist — nothing to build!")
+        return
+
+    page = all_missing[:10]
+    total_missing = len(all_missing)
+    built_names = set()
+
+    # Send the interactive embed
+    embed = bb_build_embed(page, built_names, total_missing)
+    await scanning_msg.delete()
+    panel = await ctx.send(embed=embed)
+
+    # Add number reactions for each slot on this page
+    for i in range(len(page)):
+        await panel.add_reaction(BB_EMOJIS[i])
+
+    # ── Event listeners ──
+    def reaction_check(reaction, user):
+        return (
+            user == ctx.author
+            and reaction.message.id == panel.id
+            and str(reaction.emoji) in BB_EMOJIS[:len(page)]
+        )
+
+    def message_check(m):
+        return (
+            m.author == ctx.author
+            and m.channel == ctx.channel
+            and m.content.strip().lower() == "all"
+        )
+
+    # ── Interactive loop ──
+    while True:
+        # Check if everything on this page is already built
+        remaining_on_page = [e for e in page if e[0] not in built_names]
+        if not remaining_on_page:
+            await panel.edit(embed=discord.Embed(
+                title="✅ All Done!",
+                description=f"Built **{len(built_names)}** channel(s) successfully!\n" +
+                            "\n".join(f"✅ `{n}`" for n in built_names),
+                color=discord.Color.green()
+            ))
+            try:
+                await panel.clear_reactions()
+            except:
+                pass
+            break
+
+        try:
+            done, _ = await asyncio.wait(
+                [
+                    asyncio.ensure_future(bot.wait_for("reaction_add", check=reaction_check, timeout=120)),
+                    asyncio.ensure_future(bot.wait_for("message",      check=message_check,  timeout=120)),
+                ],
+                return_when=asyncio.FIRST_COMPLETED
+            )
+        except asyncio.TimeoutError:
+            await panel.edit(embed=discord.Embed(
+                title="⏰ Session Timed Out",
+                description=f"Built **{len(built_names)}** channel(s) before timing out.\n" +
+                            (("\n".join(f"✅ `{n}`" for n in built_names)) if built_names else "_None built._"),
+                color=discord.Color.orange()
+            ))
+            try:
+                await panel.clear_reactions()
+            except:
+                pass
+            break
+
+        # Cancel the other pending future
+        for future in done:
+            pass
+        # Collect result from whichever fired
+        result = None
+        timed_out = False
+        for future in done:
+            try:
+                result = future.result()
+            except asyncio.TimeoutError:
+                timed_out = True
+
+        if timed_out:
+            await panel.edit(embed=discord.Embed(
+                title="⏰ Session Timed Out",
+                description=f"Built **{len(built_names)}** channel(s) before timing out.\n" +
+                            (("\n".join(f"✅ `{n}`" for n in built_names)) if built_names else "_None built._"),
+                color=discord.Color.orange()
+            ))
+            try:
+                await panel.clear_reactions()
+            except:
+                pass
+            break
+
+        # ── "All" typed in chat ──
+        if isinstance(result, discord.Message):
+            try:
+                await result.delete()
+            except:
+                pass
+            building_embed = discord.Embed(
+                title="⚙️ Building All Missing Channels...",
+                description="Please wait, this may take a moment.",
+                color=EMBED_COLOR
+            )
+            await panel.edit(embed=building_embed)
+            try:
+                await panel.clear_reactions()
+            except:
+                pass
+
+            for (ch_name, cat_name, ow_type) in page:
+                if ch_name not in built_names:
+                    try:
+                        await bb_build_one(guild, ch_name, cat_name, ow_type, roles)
+                        built_names.add(ch_name)
+                    except Exception as e:
+                        print(f"[BB] Error building {ch_name}: {e}")
+
+            await panel.edit(embed=discord.Embed(
+                title="✅ All Done!",
+                description=f"Built **{len(built_names)}** channel(s) successfully!\n" +
+                            "\n".join(f"✅ `{n}`" for n in built_names),
+                color=discord.Color.green()
+            ))
+            break
+
+        # ── Reaction picked ──
+        if isinstance(result, tuple):
+            reaction, user = result
+            # Remove their reaction so they can react again if needed
+            try:
+                await panel.remove_reaction(reaction.emoji, user)
+            except:
+                pass
+
+            idx = BB_EMOJIS.index(str(reaction.emoji))
+            if idx >= len(page):
+                continue
+
+            ch_name, cat_name, ow_type = page[idx]
+
+            if ch_name in built_names:
+                continue  # already built, ignore
+
+            # Update embed to show "building..."
+            building_lines = []
+            for i, (cn, _, _) in enumerate(page):
+                e = BB_EMOJIS[i]
+                if cn in built_names:
+                    building_lines.append(f"{e} ~~`{cn}`~~ ✅")
+                elif cn == ch_name:
+                    building_lines.append(f"{e} `{cn}` ⚙️ *building...*")
+                else:
+                    building_lines.append(f"{e} `{cn}`")
+            building_embed = discord.Embed(
+                title="🔍 Missing Channels",
+                description=(
+                    f"Found **{total_missing}** missing channel(s). Showing up to 10.\n\n"
+                    + "\n".join(building_lines)
+                    + f"\n\n{'━'*30}\n"
+                    + f"React with the number to build that channel.\n"
+                    + f"Type **`All`** in chat to build everything at once."
+                ),
+                color=EMBED_COLOR
+            )
+            await panel.edit(embed=building_embed)
+
+            try:
+                await bb_build_one(guild, ch_name, cat_name, ow_type, roles)
+                built_names.add(ch_name)
+            except Exception as e:
+                await ctx.send(f"❌ Failed to build `{ch_name}`: {e}", delete_after=10)
+
+            # Refresh the panel embed
+            await panel.edit(embed=bb_build_embed(page, built_names, total_missing))
 
 # =========================
 # START
