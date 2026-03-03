@@ -1,226 +1,167 @@
-import discord
-from discord.ext import commands
-from flask import Flask
-from threading import Thread
-import os
+require("dotenv").config();
+const fs = require("fs");
+const path = require("path");
 
-# =========================
-# TOKEN FROM RENDER ENV
-# =========================
-TOKEN = os.getenv("TOKEN")
+const {
+  Client,
+  GatewayIntentBits,
+  EmbedBuilder,
+  REST,
+  Routes,
+  SlashCommandBuilder
+} = require("discord.js");
 
-intents = discord.Intents.all()
-bot = commands.Bot(command_prefix="!", intents=intents)
+const client = new Client({
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMembers
+  ]
+});
 
-# =========================
-# KEEP ALIVE WEB SERVER
-# =========================
-app = Flask(__name__)
+const DIVIDER = "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━";
 
-@app.route('/')
-def home():
-    return "Bot is alive"
+// Optional fallback URL if no local banner exists
+const FALLBACK_BANNER_URL = "https://your-banner-url-if-needed.com/banner.png";
 
-def run_web():
-    port = int(os.environ.get("PORT", 10000))
-    app.run(host="0.0.0.0", port=port)
+// Detect local banner
+const localBannerPath = path.join(__dirname, "banner.png");
+const hasLocalBanner = fs.existsSync(localBannerPath);
 
-def keep_alive():
-    t = Thread(target=run_web)
-    t.start()
+/* ===============================
+   FUNCTION: SEND BANNER
+================================ */
 
-# =========================
-# READY EVENT
-# =========================
-@bot.event
-async def on_ready():
-    print(f"Logged in as {bot.user}")
+async function sendBanner(channel) {
+  if (hasLocalBanner) {
+    await channel.send({
+      files: [localBannerPath]
+    });
+  } else if (FALLBACK_BANNER_URL) {
+    await channel.send({
+      content: FALLBACK_BANNER_URL
+    });
+  }
+}
 
-# =========================
-# BUILD SERVER COMMAND
-# =========================
-@bot.command()
-@commands.has_permissions(administrator=True)
-async def build(ctx):
+/* ===============================
+   JOIN EVENT
+================================ */
 
-    guild = ctx.guild
-    await ctx.send("⚙️ Building full pro setup...")
+client.on("guildMemberAdd", async (member) => {
+  const channel = member.guild.channels.cache.find(
+    c => c.name === "joins"
+  );
+  if (!channel) return;
 
-    # ===== ROLES =====
-    roles = {
-        "{.Σ} Owner": discord.Color.red(),
-        "{.Σ} Admin": discord.Color.dark_red(),
-        "{.Σ} Moderator": discord.Color.orange(),
-        "{.Σ} Media Team": discord.Color.purple(),
-        "{.Σ} VIP": discord.Color.gold(),
-        "🎮 Gamer": discord.Color.blue(),
-        "🎵 Music Addict": discord.Color.magenta(),
-        "😂 Meme Lord": discord.Color.teal(),
-        "🔥 Active": discord.Color.brand_red(),
-        "Muted": discord.Color.dark_grey(),
-    }
+  // 1️⃣ Banner
+  await sendBanner(channel);
 
-    created_roles = {}
+  // 2️⃣ Premium Embed
+  const embed = new EmbedBuilder()
+    .setColor("#2b2d31")
+    .setAuthor({
+      name: "Member Joined",
+      iconURL: member.user.displayAvatarURL({ dynamic: true })
+    })
+    .setTitle(`Welcome ${member} to ${member.guild.name}`)
+    .setDescription(
+      `> Account Created: <t:${Math.floor(member.user.createdTimestamp / 1000)}:R>\n` +
+      `> Member Count: **${member.guild.memberCount}**\n` +
+      `> User ID: \`${member.id}\``
+    )
+    .setThumbnail(member.user.displayAvatarURL({ dynamic: true, size: 512 }))
+    .setFooter({ text: `${member.guild.name} • New Arrival` })
+    .setTimestamp();
 
-    for name, color in roles.items():
-        role = await guild.create_role(name=name, color=color)
-        created_roles[name] = role
+  await channel.send({ embeds: [embed] });
 
-    # ===== VERIFICATION + LOGS CATEGORY =====
-    verify_category = await guild.create_category("{.Σ} ───── VERIFICATION ─────")
+  // 3️⃣ Divider
+  await channel.send(DIVIDER);
+});
 
-    await guild.create_text_channel("{.Σ}-verification", category=verify_category)
-    logs_channel = await guild.create_text_channel("{.Σ}-logs", category=verify_category)
+/* ===============================
+   LEAVE EVENT
+================================ */
 
-    # ===== MAIN STRUCTURE =====
-    structure = {
-        "{.Σ} ───── INFORMATION ─────": [
-            "welcome",
-            "rules",
-            "announcements"
-        ],
-        "{.Σ} ───── COMMUNITY ─────": [
-            "general",
-            "chat",
-            "memes",
-            "polls",
-            "questions"
-        ],
-        "{.Σ} ───── MEDIA ZONE ─────": [
-            "photos",
-            "videos",
-            "clips",
-            "artwork",
-            "music",
-            "selfies",
-            "gaming-clips",
-            "edits",
-            "stream-highlights",
-            "youtube-links"
-        ],
-        "{.Σ} ───── STAFF ─────": [
-            "staff-chat",
-            "mod-logs",
-            "admin-only"
-        ]
-    }
+client.on("guildMemberRemove", async (member) => {
+  const channel = member.guild.channels.cache.find(
+    c => c.name === "leaves"
+  );
+  if (!channel) return;
 
-    for category_name, channels in structure.items():
+  // 1️⃣ Banner
+  await sendBanner(channel);
 
-        overwrites = {
-            guild.default_role: discord.PermissionOverwrite(read_messages=True)
-        }
+  // 2️⃣ Leave Embed
+  const embed = new EmbedBuilder()
+    .setColor("#1e1f22")
+    .setAuthor({
+      name: "Member Left",
+      iconURL: member.user.displayAvatarURL({ dynamic: true })
+    })
+    .setTitle(`${member.user.username} has left ${member.guild.name}`)
+    .setDescription(
+      `> Joined: <t:${Math.floor(member.joinedTimestamp / 1000)}:R>\n` +
+      `> Members Remaining: **${member.guild.memberCount}**\n` +
+      `> User ID: \`${member.id}\``
+    )
+    .setThumbnail(member.user.displayAvatarURL({ dynamic: true, size: 512 }))
+    .setFooter({ text: `${member.guild.name} • Departure Logged` })
+    .setTimestamp();
 
-        if "STAFF" in category_name:
-            overwrites = {
-                guild.default_role: discord.PermissionOverwrite(read_messages=False),
-                created_roles["{.Σ} Admin"]: discord.PermissionOverwrite(read_messages=True),
-                created_roles["{.Σ} Moderator"]: discord.PermissionOverwrite(read_messages=True)
-            }
+  await channel.send({ embeds: [embed] });
 
-        category = await guild.create_category(category_name, overwrites=overwrites)
+  // 3️⃣ Divider
+  await channel.send(DIVIDER);
+});
 
-        for channel_name in channels:
-            channel = await guild.create_text_channel(
-                f"{{.Σ}}-{channel_name}",
-                category=category
-            )
+/* ===============================
+   SLASH COMMANDS
+================================ */
 
-            embed = discord.Embed(
-                title=f"Welcome to {{.Σ}} {channel_name}",
-                description="Keep it clean and follow the rules.",
-                color=discord.Color.random()
-            )
+const commands = [
+  new SlashCommandBuilder()
+    .setName("testjoin")
+    .setDescription("Simulate a member joining"),
+  new SlashCommandBuilder()
+    .setName("testleave")
+    .setDescription("Simulate a member leaving")
+].map(command => command.toJSON());
 
-            await channel.send(embed=embed)
+client.once("ready", async () => {
+  console.log(`Logged in as ${client.user.tag}`);
 
-    await ctx.send("✅ Full pro server setup complete.")
+  const rest = new REST({ version: "10" }).setToken(process.env.DISCORD_TOKEN);
 
-# =========================
-# WIPE SERVER COMMAND
-# =========================
-@bot.command()
-@commands.has_permissions(administrator=True)
-async def wipe(ctx):
+  try {
+    await rest.put(
+      Routes.applicationCommands(client.user.id),
+      { body: commands }
+    );
+    console.log("Slash commands registered.");
+  } catch (error) {
+    console.error(error);
+  }
+});
 
-    await ctx.send("⚠️ Type CONFIRM to wipe the server.")
+client.on("interactionCreate", async (interaction) => {
+  if (!interaction.isChatInputCommand()) return;
 
-    def check(m):
-        return m.author == ctx.author and m.content == "CONFIRM"
+  const member = interaction.member;
 
-    try:
-        await bot.wait_for("message", timeout=20, check=check)
-    except:
-        await ctx.send("❌ Cancelled.")
-        return
+  if (interaction.commandName === "testjoin") {
+    client.emit("guildMemberAdd", member);
+    await interaction.reply({ content: "Simulated join.", ephemeral: true });
+  }
 
-    guild = ctx.guild
+  if (interaction.commandName === "testleave") {
+    client.emit("guildMemberRemove", member);
+    await interaction.reply({ content: "Simulated leave.", ephemeral: true });
+  }
+});
 
-    for channel in guild.channels:
-        try:
-            await channel.delete()
-        except:
-            pass
+/* ===============================
+   LOGIN
+================================ */
 
-    for role in guild.roles:
-        if role.name != "@everyone" and not role.managed:
-            try:
-                await role.delete()
-            except:
-                pass
-
-    await ctx.send("💀 Server wiped.")
-
-# =========================
-# MEMBER JOIN LOG
-# =========================
-@bot.event
-async def on_member_join(member):
-
-    logs = discord.utils.get(member.guild.channels, name="{.Σ}-logs")
-    if logs:
-        embed = discord.Embed(
-            title="Member Joined",
-            description=f"{member.mention} joined the server.",
-            color=discord.Color.green()
-        )
-        await logs.send(embed=embed)
-
-# =========================
-# MEMBER LEAVE LOG
-# =========================
-@bot.event
-async def on_member_remove(member):
-
-    logs = discord.utils.get(member.guild.channels, name="{.Σ}-logs")
-    if logs:
-        embed = discord.Embed(
-            title="Member Left",
-            description=f"{member.name} left the server.",
-            color=discord.Color.red()
-        )
-        await logs.send(embed=embed)
-
-# =========================
-# MESSAGE DELETE LOG
-# =========================
-@bot.event
-async def on_message_delete(message):
-
-    if message.author.bot:
-        return
-
-    logs = discord.utils.get(message.guild.channels, name="{.Σ}-logs")
-    if logs:
-        embed = discord.Embed(
-            title="Message Deleted",
-            description=f"User: {message.author}\nChannel: {message.channel.mention}\nContent: {message.content}",
-            color=discord.Color.orange()
-        )
-        await logs.send(embed=embed)
-
-# =========================
-# START EVERYTHING
-# =========================
-keep_alive()
-bot.run(TOKEN)
+client.login(process.env.DISCORD_TOKEN);
