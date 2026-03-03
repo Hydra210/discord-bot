@@ -15,6 +15,61 @@ bot = commands.Bot(command_prefix="!", intents=intents)
 
 DIVIDER = "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 BANNER_FILE = "banner.png"
+EMBED_COLOR = discord.Color.from_str("#501e78")
+
+# =========================
+# CHANNEL EMBED CONTENT
+# Matches your exact server layout from the scan.
+# Keys are the channel names (without {.Σ}- prefix).
+# =========================
+CHANNEL_EMBEDS = {
+    # VERIFICATION
+    "verification": "✅ React below to verify yourself and gain access to the server!",
+
+    # INFORMATION
+    "welcome":       "👋 Welcome to **{.Σ} .ΣXΣ AUDIOS**!\n\nBefore anything else, head over to <#rules> and give them a read. We keep this server clean and fun for everyone — knowing the rules is step one.\n\nOnce you're verified, you'll unlock the full server. We're glad you're here! 🎉",
+    "rules":         "**{.Σ} .ΣXΣ AUDIOS — SERVER RULES**\n\n> Follow these rules at all times. Breaking them will result in a warning, mute, kick, or ban depending on severity.\n\n**1.** Respect everyone — no harassment, hate speech, or toxicity.\n**2.** No NSFW content of any kind.\n**3.** No spamming or flooding channels.\n**4.** No advertising without permission from staff.\n**5.** Follow Discord's Terms of Service at all times.\n**6.** Listen to staff — their word is final.\n**7.** Keep content in the correct channels.\n**8.** No sharing personal information of others.\n**9.** Have fun and be a good community member! ✅",
+    "announcements": "📣 Important announcements from staff will be posted here. Stay up to date!",
+    "updates":       "🔔 Game, server, and project updates are posted here. Check back often!",
+
+    # LINKS
+    "roblox-group":  "🎮 Our official Roblox group link is pinned here. Join to get exclusive in-game perks!",
+    "game-links":    "🕹️ Links to all of our Roblox games are pinned here. Jump in and play!",
+    "my-profile":    "👤 Links to our creator's Roblox profile and social pages are pinned here.",
+    "youtube-links": "▶️ Our YouTube videos and content drops are linked here. Go watch and subscribe!",
+
+    # COMMUNITY
+    "general":          "💬 The main hangout spot. Talk about anything and everything here!",
+    "memes":            "😂 Post the funniest memes you find. Keep it appropriate!",
+    "polls":            "📊 Community polls are posted here. Vote and make your voice heard!",
+    "questions":        "❓ Have a question about the server, game, or community? Ask here!",
+    "hall-of-shame":    "😬 Post your most embarrassing moments, worst fails, and biggest L's here. Keep it fun, not personal attacks!",
+    "bot-commands":     "🤖 Use all bot commands in this channel to keep other channels clean.",
+    "community-codes":  "🎁 Community codes and giveaways are dropped here. Stay active to catch them!",
+
+    # GAMING
+    "roblox-chat":      "🎮 Talk about Roblox games, updates, and anything Roblox related here!",
+    "game-suggestions": "💡 Got an idea for a game or feature? Drop your suggestions here!",
+    "looking-to-play":  "🕹️ Looking for someone to play with? Post here and find a squad!",
+
+    # MEDIA ZONE
+    "photos":            "📷 Share your photos and screenshots here. Keep it family friendly!",
+    "videos":            "🎥 Post your videos and clips here. Only share original or credited content.",
+    "clips":             "✂️ Share short clips from games, streams, or anything cool here.",
+    "artwork":           "🎨 Share your original artwork, fan art, and creative designs here.",
+    "music":             "🎵 Share music you love or your own tracks here. Keep it chill!",
+    "selfies":           "🤳 Share your selfies here! Be kind and hype each other up.",
+    "edits":             "✨ Show off your photo and video edits here. Tag the tools you used!",
+    "stream-highlights": "📡 Best moments from streams go here. Clips, timestamps — share it all!",
+
+    # STAFF
+    "staff-chat":      "🛡️ Staff only chat. Keep discussions professional and on-topic.",
+    "mod-logs":        "📋 Automated moderation logs are recorded here.",
+    "admin-only":      "⚙️ Admin-only channel for important decisions and high-level management.",
+    "joins":           "📥 Member join logs are recorded here automatically.",
+    "leaves":          "📤 Member leave logs are recorded here automatically.",
+    "private-bot-cmds":"🤖 Private channel for owner bot commands only.",
+}
 
 # =========================
 # KEEP ALIVE WEB SERVER
@@ -38,11 +93,23 @@ def keep_alive():
     t.start()
 
 # =========================
-# SEND BANNER FUNCTION
+# HELPER: SEND BANNER
 # =========================
 async def send_banner(channel):
     if os.path.exists(BANNER_FILE):
         await channel.send(file=discord.File(BANNER_FILE))
+
+# =========================
+# HELPER: BUILD CHANNEL EMBED
+# =========================
+async def send_channel_embed(channel, channel_key=None):
+    """Send the correct embed for a channel. channel_key is the name without {.Σ}- prefix."""
+    if channel_key is None:
+        channel_key = channel.name.replace("{.Σ}-", "").replace("{.σ}-", "")
+
+    description = CHANNEL_EMBEDS.get(channel_key, f"Welcome to {channel.name}. Keep it clean and follow the rules.")
+    embed = discord.Embed(description=description, color=EMBED_COLOR)
+    await channel.send(embed=embed)
 
 # =========================
 # READY EVENT
@@ -57,24 +124,37 @@ async def on_ready():
 # =========================
 @bot.event
 async def on_member_join(member):
+    # Send join notification to welcome channel
     welcome_channel = discord.utils.get(member.guild.text_channels, name="{.Σ}-welcome")
     if welcome_channel:
-        await send_banner(welcome_channel)
         embed = discord.Embed(
-            title=f"👋 Welcome {member.name}!",
-            description=f"Hey {member.mention}! Welcome to **{member.guild.name}**!\n\n📖 **Please read the rules** and head to verification to get started!",
-            color=discord.Color.gold()
+            title=f"👋 {member.name} just joined the server!",
+            description=f"Hey {member.mention}, welcome to **{member.guild.name}**! 🎉\n\nMake sure you read the rules and get verified to unlock the full server.",
+            color=discord.Color.green()
         )
         embed.set_thumbnail(url=member.display_avatar.url)
-        embed.add_field(
-            name="📋 Next Steps",
-            value="1️⃣ Read the rules\n2️⃣ Get verified\n3️⃣ Enjoy the server!",
-            inline=False
-        )
+        embed.add_field(name="📋 Rules", value="Head to <#rules> before anything else.", inline=True)
+        embed.add_field(name="✅ Verification", value="Get verified to unlock all channels.", inline=True)
         embed.set_footer(text=f"Member #{member.guild.member_count}", icon_url=member.guild.icon.url if member.guild.icon else None)
         embed.timestamp = discord.utils.utcnow()
         await welcome_channel.send(embed=embed)
         await welcome_channel.send(DIVIDER)
+
+    joins_channel = discord.utils.get(member.guild.text_channels, name="{.Σ}-joins")
+    if joins_channel:
+        await send_banner(joins_channel)
+        embed = discord.Embed(
+            title=f"🎉 Welcome to {member.guild.name}!",
+            description=f"Hey {member.mention}! We're glad you're here. Make yourself at home!",
+            color=discord.Color.green()
+        )
+        embed.set_thumbnail(url=member.display_avatar.url)
+        embed.add_field(name="👋 You're our member #", value=str(member.guild.member_count), inline=True)
+        embed.add_field(name="📅 Account Age", value=f"<t:{int(member.created_at.timestamp())}:R>", inline=True)
+        embed.set_footer(text=member.guild.name, icon_url=member.guild.icon.url if member.guild.icon else None)
+        embed.timestamp = discord.utils.utcnow()
+        await joins_channel.send(embed=embed)
+        await joins_channel.send(DIVIDER)
 
     logs = discord.utils.get(member.guild.channels, name="{.Σ}-logs")
     if logs:
@@ -94,6 +174,20 @@ async def on_member_join(member):
 # =========================
 @bot.event
 async def on_member_remove(member):
+    leaves_channel = discord.utils.get(member.guild.text_channels, name="{.Σ}-leaves")
+    if leaves_channel:
+        embed = discord.Embed(
+            title="👋 A member has left",
+            description=f"**{member.name}** has left the server.",
+            color=discord.Color.red()
+        )
+        if member.joined_at:
+            embed.add_field(name="Time with us", value=f"<t:{int(member.joined_at.timestamp())}:R>", inline=True)
+        embed.add_field(name="Members Remaining", value=str(member.guild.member_count), inline=True)
+        embed.set_thumbnail(url=member.display_avatar.url)
+        embed.timestamp = discord.utils.utcnow()
+        await leaves_channel.send(embed=embed)
+
     logs = discord.utils.get(member.guild.channels, name="{.Σ}-logs")
     if logs:
         embed = discord.Embed(
@@ -129,81 +223,179 @@ async def on_message_delete(message):
 
 # =========================
 # BUILD SERVER COMMAND
+# Builds the full server from scratch based on your exact layout.
 # =========================
 @bot.command()
 @commands.is_owner()
 async def build(ctx):
     guild = ctx.guild
-    await ctx.send("⚙️ Building full pro setup...")
+    await ctx.send("⚙️ Building full server setup... this will take a moment.")
 
-    roles = {
-        "{.Σ} Owner": discord.Color.red(),
-        "{.Σ} Admin": discord.Color.dark_red(),
+    # ===== ROLES =====
+    roles_to_create = {
+        "{.Σ} Owner":    discord.Color.red(),
+        "{.Σ} Admin":    discord.Color.dark_red(),
         "{.Σ} Moderator": discord.Color.orange(),
         "{.Σ} Media Team": discord.Color.purple(),
-        "{.Σ} VIP": discord.Color.gold(),
-        "✅ Verified": discord.Color.green(),
+        "{.Σ} VIP":      discord.Color.gold(),
+        "✅ Verified":   discord.Color.green(),
         "❌ Unverified": discord.Color.dark_gray(),
-        "🎮 Gamer": discord.Color.blue(),
+        "🎮 Gamer":      discord.Color.blue(),
         "🎵 Music Addict": discord.Color.magenta(),
-        "😂 Meme Lord": discord.Color.teal(),
-        "🔥 Active": discord.Color.brand_red(),
-        "Muted": discord.Color.dark_grey(),
+        "😂 Meme Lord":  discord.Color.teal(),
+        "🔥 Active":     discord.Color.brand_red(),
+        "Muted":         discord.Color.dark_grey(),
     }
 
     created_roles = {}
-    for name, color in roles.items():
+    for name, color in roles_to_create.items():
         role = await guild.create_role(name=name, color=color)
         created_roles[name] = role
 
-    verify_overwrites = {
-        guild.default_role: discord.PermissionOverwrite(read_messages=False),
-        created_roles["❌ Unverified"]: discord.PermissionOverwrite(read_messages=True, send_messages=True),
+    owner_r    = created_roles["{.Σ} Owner"]
+    admin_r    = created_roles["{.Σ} Admin"]
+    mod_r      = created_roles["{.Σ} Moderator"]
+    verified_r = created_roles["✅ Verified"]
+    unverified_r = created_roles["❌ Unverified"]
+
+    ev = guild.default_role  # @everyone shorthand
+
+    # =========================
+    # HELPER: permission overwrites builder
+    # =========================
+    def ow(read=None, send=None, history=None):
+        return discord.PermissionOverwrite(
+            read_messages=read,
+            send_messages=send,
+            read_message_history=history
+        )
+
+    # ===== VERIFICATION CATEGORY =====
+    verify_cat_ow = {
+        ev:           ow(read=False, history=False),
+        unverified_r: ow(read=True, send=True, history=True),
+        verified_r:   ow(read=False, history=False),
+        mod_r:        ow(read=True, send=True, history=True),
+        admin_r:      ow(read=True, send=True, history=True),
+        owner_r:      ow(read=True, send=True, history=True),
     }
-    verify_category = await guild.create_category("{.Σ} ───── VERIFICATION ─────", overwrites=verify_overwrites)
-    verification_channel = await guild.create_text_channel("{.Σ}-verification", category=verify_category)
+    verify_cat = await guild.create_category("{.Σ} ───── VERIFICATION ─────", overwrites=verify_cat_ow)
 
-    logs_overwrites = {
-        guild.default_role: discord.PermissionOverwrite(read_messages=False),
-        created_roles["{.Σ} Admin"]: discord.PermissionOverwrite(read_messages=True),
-        created_roles["{.Σ} Moderator"]: discord.PermissionOverwrite(read_messages=True)
+    verify_ch = await guild.create_text_channel("{.Σ}-verification", category=verify_cat, overwrites=verify_cat_ow)
+    await send_channel_embed(verify_ch, "verification")
+
+    logs_cat_ow = {
+        ev:      ow(read=False, history=False),
+        mod_r:   ow(read=True, send=True, history=True),
+        admin_r: ow(read=True, send=True, history=True),
+        owner_r: ow(read=True, send=True, history=True),
     }
-    logs_category = await guild.create_category("{.Σ} ───── LOGS ─────", overwrites=logs_overwrites)
-    logs_channel = await guild.create_text_channel("{.Σ}-logs", category=logs_category)
+    logs_cat = await guild.create_category("{.Σ} ───── LOGS ─────", overwrites=logs_cat_ow)
+    logs_ch = await guild.create_text_channel("{.Σ}-logs", category=logs_cat, overwrites=logs_cat_ow)
 
-    structure = {
-        "{.Σ} ───── INFORMATION ─────": ["welcome", "rules", "announcements"],
-        "{.Σ} ───── COMMUNITY ─────": ["general", "chat", "memes", "polls", "questions"],
-        "{.Σ} ───── LINKS ─────": ["youtube", "twitch", "socials", "partnerships"],
-        "{.Σ} ───── MEDIA ZONE ─────": ["photos", "videos", "clips", "artwork", "music", "selfies", "gaming-clips", "edits", "stream-highlights"],
-        "{.Σ} ───── STAFF ─────": ["staff-chat", "mod-logs", "admin-only"]
+    # ===== INFORMATION CATEGORY =====
+    # Verified can read but not send. Staff can do both.
+    info_cat_ow = {
+        ev:        ow(read=False, send=False, history=False),
+        verified_r: ow(read=True, send=False, history=True),
+        mod_r:     ow(read=True, send=True, history=True),
+        admin_r:   ow(read=True, send=True, history=True),
+        owner_r:   ow(read=True, send=True, history=True),
     }
+    info_cat = await guild.create_category("{.Σ} ───── INFORMATION ─────", overwrites=info_cat_ow)
+    for ch_name in ["welcome", "rules", "announcements", "updates"]:
+        ch = await guild.create_text_channel(f"{{.Σ}}-{ch_name}", category=info_cat, overwrites=info_cat_ow)
+        await send_channel_embed(ch, ch_name)
 
-    for category_name, channels in structure.items():
-        overwrites = {
-            guild.default_role: discord.PermissionOverwrite(read_messages=True),
-            created_roles["❌ Unverified"]: discord.PermissionOverwrite(read_messages=False)
-        }
-        if "STAFF" in category_name:
-            overwrites = {
-                guild.default_role: discord.PermissionOverwrite(read_messages=False),
-                created_roles["{.Σ} Admin"]: discord.PermissionOverwrite(read_messages=True),
-                created_roles["{.Σ} Moderator"]: discord.PermissionOverwrite(read_messages=True)
-            }
-        if "INFORMATION" in category_name:
-            overwrites[created_roles["❌ Unverified"]] = discord.PermissionOverwrite(read_messages=True, send_messages=False)
+    # ===== LINKS CATEGORY =====
+    # Verified can read but not send. Staff can do both.
+    links_cat_ow = {
+        ev:        ow(read=False, send=False, history=False),
+        verified_r: ow(read=True, send=False, history=True),
+        mod_r:     ow(read=True, send=True, history=True),
+        admin_r:   ow(read=True, send=True, history=True),
+        owner_r:   ow(read=True, send=True, history=True),
+    }
+    links_cat = await guild.create_category("{.Σ} ───── LINKS ─────", overwrites=links_cat_ow)
+    for ch_name in ["roblox-group", "game-links", "my-profile", "youtube-links"]:
+        ch = await guild.create_text_channel(f"{{.Σ}}-{ch_name}", category=links_cat, overwrites=links_cat_ow)
+        await send_channel_embed(ch, ch_name)
 
-        category = await guild.create_category(category_name, overwrites=overwrites)
-        for channel_name in channels:
-            channel = await guild.create_text_channel(f"{{.Σ}}-{channel_name}", category=category)
-            embed = discord.Embed(
-                title=f"Welcome to {{.Σ}} {channel_name}",
-                description="Keep it clean and follow the rules.",
-                color=discord.Color.purple()
-            )
-            await channel.send(embed=embed)
+    # ===== COMMUNITY CATEGORY =====
+    # Verified can read AND send. Staff can do both.
+    # hall-of-shame and bot-commands: verified can read but not send.
+    community_cat_ow = {
+        ev:        ow(read=False, history=False),
+        verified_r: ow(read=True, send=True, history=True),
+        mod_r:     ow(read=True, send=True, history=True),
+        admin_r:   ow(read=True, send=True, history=True),
+        owner_r:   ow(read=True, send=True, history=True),
+    }
+    community_readonly_ow = {
+        ev:        ow(read=False, send=False, history=False),
+        verified_r: ow(read=True, send=False, history=True),
+        mod_r:     ow(read=True, send=True, history=True),
+        admin_r:   ow(read=True, send=True, history=True),
+        owner_r:   ow(read=True, send=True, history=True),
+    }
+    community_cat = await guild.create_category("{.Σ} ───── COMMUNITY ─────", overwrites=community_cat_ow)
+    for ch_name in ["general", "memes", "polls", "questions", "community-codes"]:
+        ch = await guild.create_text_channel(f"{{.Σ}}-{ch_name}", category=community_cat, overwrites=community_cat_ow)
+        await send_channel_embed(ch, ch_name)
+    for ch_name in ["hall-of-shame", "bot-commands"]:
+        ch = await guild.create_text_channel(f"{{.Σ}}-{ch_name}", category=community_cat, overwrites=community_readonly_ow)
+        await send_channel_embed(ch, ch_name)
 
-    await ctx.send("✅ Full pro server setup complete.")
+    # ===== GAMING CATEGORY =====
+    gaming_cat_ow = {
+        ev:        ow(read=False, history=False),
+        verified_r: ow(read=True, send=True, history=True),
+        mod_r:     ow(read=True, send=True, history=True),
+        admin_r:   ow(read=True, send=True, history=True),
+        owner_r:   ow(read=True, send=True, history=True),
+    }
+    gaming_cat = await guild.create_category("{.Σ} ───── GAMING ─────", overwrites=gaming_cat_ow)
+    for ch_name in ["roblox-chat", "game-suggestions", "looking-to-play"]:
+        ch = await guild.create_text_channel(f"{{.Σ}}-{ch_name}", category=gaming_cat, overwrites=gaming_cat_ow)
+        await send_channel_embed(ch, ch_name)
+
+    # ===== MEDIA ZONE CATEGORY =====
+    media_cat_ow = {
+        ev:        ow(read=False, history=False),
+        verified_r: ow(read=True, send=True, history=True),
+        mod_r:     ow(read=True, send=True, history=True),
+        admin_r:   ow(read=True, send=True, history=True),
+        owner_r:   ow(read=True, send=True, history=True),
+    }
+    media_cat = await guild.create_category("{.Σ} ───── MEDIA ZONE ─────", overwrites=media_cat_ow)
+    for ch_name in ["photos", "videos", "clips", "artwork", "music", "selfies", "edits", "stream-highlights"]:
+        ch = await guild.create_text_channel(f"{{.Σ}}-{ch_name}", category=media_cat, overwrites=media_cat_ow)
+        await send_channel_embed(ch, ch_name)
+
+    # ===== STAFF CATEGORY =====
+    staff_cat_ow = {
+        ev:      ow(read=False, history=False),
+        mod_r:   ow(read=True, send=True, history=True),
+        admin_r: ow(read=True, send=True, history=True),
+        owner_r: ow(read=True, send=True, history=True),
+    }
+    # joins/leaves: verified can read (read-only)
+    staff_visible_ow = {
+        ev:        ow(read=False, history=False),
+        verified_r: ow(read=True, send=False, history=True),
+        mod_r:     ow(read=True, send=True, history=True),
+        admin_r:   ow(read=True, send=True, history=True),
+        owner_r:   ow(read=True, send=True, history=True),
+    }
+    staff_cat = await guild.create_category("{.Σ} ───── STAFF ─────", overwrites=staff_cat_ow)
+    for ch_name in ["staff-chat", "mod-logs", "admin-only", "private-bot-cmds"]:
+        ch = await guild.create_text_channel(f"{{.Σ}}-{ch_name}", category=staff_cat, overwrites=staff_cat_ow)
+        await send_channel_embed(ch, ch_name)
+    for ch_name in ["joins", "leaves"]:
+        ch = await guild.create_text_channel(f"{{.Σ}}-{ch_name}", category=staff_cat, overwrites=staff_visible_ow)
+        await send_channel_embed(ch, ch_name)
+
+    await ctx.send("✅ Full server setup complete!")
 
 # =========================
 # WIPE SERVER COMMAND
@@ -211,7 +403,7 @@ async def build(ctx):
 @bot.command()
 @commands.is_owner()
 async def wipe(ctx):
-    await ctx.send("⚠️ Type CONFIRM to wipe the server.")
+    await ctx.send("⚠️ Type CONFIRM to wipe the entire server.")
 
     def check(m):
         return m.author == ctx.author and m.content == "CONFIRM"
@@ -234,44 +426,56 @@ async def wipe(ctx):
                 await role.delete()
             except:
                 pass
+
     await ctx.send("💀 Server wiped.")
 
 # =========================
 # UPDATE CHANNEL COMMAND
+# Wipes a channel and resends whatever is currently defined for it in
+# CHANNEL_EMBEDS (and any extra messages below). So when you update the
+# script and redeploy, run !updatechan #channel to push the changes live.
+# Usage: !updatechan #channel-name
 # =========================
 @bot.command()
 @commands.is_owner()
 async def updatechan(ctx, channel: discord.TextChannel):
-    """Clear and rebuild a specific channel"""
-    msg = await ctx.send(f"🔄 Clearing and rebuilding {channel.mention}...")
+    msg = await ctx.send(f"🔄 Updating {channel.mention}...")
     try:
+        # Wipe everything in the channel
         deleted = await channel.purge(limit=None)
+
+        # Sync permissions back to category in case those changed too
         if channel.category:
             await channel.edit(sync_permissions=True)
-        channel_name = channel.name.replace("{.Σ}-", "")
-        embed = discord.Embed(
-            title=f"Welcome to {{.Σ}} {channel_name}",
-            description="Keep it clean and follow the rules.",
-            color=discord.Color.purple()
-        )
-        await channel.send(embed=embed)
-        await msg.edit(content=f"✅ Successfully rebuilt {channel.mention}! Deleted {len(deleted)} messages.")
+
+        # Get the channel key (strip {.Σ}- prefix)
+        ch_key = channel.name.replace("{.Σ}-", "").replace("{.σ}-", "")
+
+        if ch_key not in CHANNEL_EMBEDS:
+            await msg.edit(content=f"⚠️ Cleared {channel.mention} ({len(deleted)} messages) but `{ch_key}` has no entry in CHANNEL_EMBEDS. Add it to the script first.")
+            return
+
+        # Resend the current content from the script
+        await send_channel_embed(channel, ch_key)
+        await msg.edit(content=f"✅ {channel.mention} updated! ({len(deleted)} old messages cleared)")
     except Exception as e:
         await msg.edit(content=f"❌ Error: {str(e)}")
 
 # =========================
 # FIX PERMISSIONS COMMAND
+# Usage: !fixperms #channel | !fixperms category_name | !fixperms all
 # =========================
 @bot.command()
 @commands.is_owner()
 async def fixperms(ctx, *, target=None):
-    """Fix permissions for channels/categories"""
     if not target:
         await ctx.send("❌ Usage: `!fixperms #channel`, `!fixperms category_name`, or `!fixperms all`")
         return
 
-    unverified_role = discord.utils.get(ctx.guild.roles, name="❌ Unverified")
-    if not unverified_role:
+    unverified_r = discord.utils.get(ctx.guild.roles, name="❌ Unverified")
+    verified_r   = discord.utils.get(ctx.guild.roles, name="✅ Verified")
+
+    if not unverified_r:
         await ctx.send("❌ Could not find '❌ Unverified' role!")
         return
 
@@ -279,31 +483,31 @@ async def fixperms(ctx, *, target=None):
     fixed_count = 0
 
     if ctx.message.channel_mentions:
-        channel = ctx.message.channel_mentions[0]
+        ch = ctx.message.channel_mentions[0]
         try:
-            await channel.set_permissions(ctx.guild.default_role, read_messages=True, read_message_history=True)
-            await channel.set_permissions(unverified_role, read_messages=False, read_message_history=False)
-            if "welcome" in channel.name or "verification" in channel.name:
-                await channel.set_permissions(unverified_role, read_messages=True, read_message_history=True)
-            await msg.edit(content=f"✅ Fixed permissions for {channel.mention}")
+            await ch.set_permissions(ctx.guild.default_role, read_messages=True, read_message_history=True)
+            await ch.set_permissions(unverified_r, read_messages=False, read_message_history=False)
+            if "welcome" in ch.name or "verification" in ch.name:
+                await ch.set_permissions(unverified_r, read_messages=True, read_message_history=True)
+            await msg.edit(content=f"✅ Fixed permissions for {ch.mention}")
         except Exception as e:
             await msg.edit(content=f"❌ Error: {str(e)}")
         return
 
     target = target.lower()
-    categories_to_fix = ["links", "information", "community", "verification"] if target == "all" else [target]
+    cats_to_fix = ["links", "information", "community", "verification", "gaming", "media"] if target == "all" else [target]
 
-    for category in ctx.guild.categories:
-        if any(cat in category.name.lower() for cat in categories_to_fix):
-            for channel in category.channels:
+    for cat in ctx.guild.categories:
+        if any(c in cat.name.lower() for c in cats_to_fix):
+            for ch in cat.channels:
                 try:
-                    await channel.set_permissions(ctx.guild.default_role, read_messages=True, read_message_history=True)
-                    await channel.set_permissions(unverified_role, read_messages=False, read_message_history=False)
-                    if "welcome" in channel.name or "verification" in channel.name:
-                        await channel.set_permissions(unverified_role, read_messages=True, read_message_history=True)
+                    await ch.set_permissions(ctx.guild.default_role, read_messages=True, read_message_history=True)
+                    await ch.set_permissions(unverified_r, read_messages=False, read_message_history=False)
+                    if "welcome" in ch.name or "verification" in ch.name:
+                        await ch.set_permissions(unverified_r, read_messages=True, read_message_history=True)
                     fixed_count += 1
                 except Exception as e:
-                    print(f"Error fixing {channel.name}: {e}")
+                    print(f"Error fixing {ch.name}: {e}")
 
     await msg.edit(content=f"✅ Fixed permissions for {fixed_count} channels!")
 
@@ -313,7 +517,6 @@ async def fixperms(ctx, *, target=None):
 @bot.command()
 @commands.is_owner()
 async def scan(ctx):
-    """Scan entire server and output all details to a file"""
     await ctx.send("🔍 Scanning server... This might take a minute.")
     guild = ctx.guild
     output = []
@@ -323,8 +526,7 @@ async def scan(ctx):
     output.append(f"Server ID: {guild.id}")
     output.append(f"Owner: {guild.owner}")
     output.append(f"Member Count: {guild.member_count}")
-    output.append("="*50)
-    output.append("")
+    output.append("="*50 + "\n")
 
     output.append("📋 ROLES:")
     output.append("-"*50)
@@ -341,96 +543,52 @@ async def scan(ctx):
 
     output.append("📁 CATEGORIES & CHANNELS:")
     output.append("-"*50)
-    for category in guild.categories:
-        output.append(f"\n📂 CATEGORY: {category.name}")
-        output.append(f"   ID: {category.id}")
-        output.append(f"   Position: {category.position}")
+    for cat in guild.categories:
+        output.append(f"\n📂 CATEGORY: {cat.name}")
+        output.append(f"   ID: {cat.id} | Position: {cat.position}")
         output.append(f"   PERMISSIONS:")
-        for target, overwrite in category.overwrites.items():
-            output.append(f"      {target.name}:")
-            perms = [f"{perm}: {value}" for perm, value in overwrite if value is not None]
-            output.append(f"         {', '.join(perms)}")
-        for channel in category.channels:
-            if isinstance(channel, discord.TextChannel):
-                output.append(f"\n   💬 TEXT CHANNEL: {channel.name}")
-            elif isinstance(channel, discord.VoiceChannel):
-                output.append(f"\n   🔊 VOICE CHANNEL: {channel.name}")
-            output.append(f"      ID: {channel.id}")
-            output.append(f"      Position: {channel.position}")
-            if isinstance(channel, discord.TextChannel):
-                output.append(f"      Topic: {channel.topic}")
-                output.append(f"      NSFW: {channel.nsfw}")
-                output.append(f"      Slowmode: {channel.slowmode_delay}s")
-            output.append(f"      PERMISSIONS:")
-            for target, overwrite in channel.overwrites.items():
-                output.append(f"         {target.name}:")
-                perms = [f"{perm}: {value}" for perm, value in overwrite if value is not None]
+        for t, ow in cat.overwrites.items():
+            perms = [f"{p}: {v}" for p, v in ow if v is not None]
+            output.append(f"      {t.name}: {', '.join(perms)}")
+        for ch in cat.channels:
+            ch_type = "💬" if isinstance(ch, discord.TextChannel) else "🔊"
+            output.append(f"\n   {ch_type} {ch.name} (ID: {ch.id})")
+            for t, ow in ch.overwrites.items():
+                perms = [f"{p}: {v}" for p, v in ow if v is not None]
                 if perms:
-                    output.append(f"            {', '.join(perms)}")
-            if isinstance(channel, discord.TextChannel):
+                    output.append(f"      {t.name}: {', '.join(perms)}")
+            if isinstance(ch, discord.TextChannel):
                 try:
-                    messages = [msg async for msg in channel.history(limit=5)]
-                    if messages:
-                        output.append(f"      RECENT MESSAGES (last 5):")
-                        for msg in reversed(messages):
-                            content = msg.content[:100] if msg.content else "[No text content]"
-                            output.append(f"         [{msg.author.name}]: {content}")
-                            if msg.embeds:
-                                output.append(f"            [Has {len(msg.embeds)} embed(s)]")
-                                for embed in msg.embeds:
-                                    output.append(f"               Title: {embed.title}")
-                                    output.append(f"               Description: {embed.description[:100] if embed.description else 'None'}")
-                                    output.append(f"               Color: {embed.color}")
-                                    if embed.fields:
-                                        for field in embed.fields:
-                                            output.append(f"               Field: {field.name} = {field.value[:50]}")
+                    msgs = [m async for m in ch.history(limit=5)]
+                    if msgs:
+                        output.append(f"      RECENT MESSAGES:")
+                        for m in reversed(msgs):
+                            if m.author.bot:
+                                continue
+                            content = m.content[:100] if m.content else "[embed only]"
+                            output.append(f"         [{m.author.name}]: {content}")
                 except:
                     output.append(f"      [Could not read messages]")
-
-    output.append(f"\n📂 CHANNELS (No Category):")
-    for channel in guild.channels:
-        if channel.category is None:
-            if isinstance(channel, discord.TextChannel):
-                output.append(f"\n   💬 TEXT CHANNEL: {channel.name}")
-            elif isinstance(channel, discord.VoiceChannel):
-                output.append(f"\n   🔊 VOICE CHANNEL: {channel.name}")
-            output.append(f"      ID: {channel.id}")
-            output.append(f"      PERMISSIONS:")
-            for target, overwrite in channel.overwrites.items():
-                output.append(f"         {target.name}:")
-                perms = [f"{perm}: {value}" for perm, value in overwrite if value is not None]
-                if perms:
-                    output.append(f"            {', '.join(perms)}")
 
     output.append("\n" + "="*50 + "\n")
     output.append("👥 MEMBERS:")
     output.append("-"*50)
     for member in guild.members:
-        output.append(f"\nMember: {member.name} ({member.display_name})")
-        output.append(f"  ID: {member.id}")
-        output.append(f"  Bot: {member.bot}")
-        output.append(f"  Joined: {member.joined_at}")
+        output.append(f"\n{member.name} | Bot: {member.bot} | Top Role: {member.top_role.name}")
         output.append(f"  Roles: {', '.join([r.name for r in member.roles[1:]])}")
-        output.append(f"  Top Role: {member.top_role.name}")
-        output.append(f"  Permissions (server-wide): {member.guild_permissions.value}")
 
-    output.append("\n" + "="*50 + "\n")
-    output.append("😀 EMOJIS:")
-    output.append("-"*50)
-    for emoji in guild.emojis:
-        output.append(f"  {emoji.name} - ID: {emoji.id} - Animated: {emoji.animated}")
     output.append("\n" + "="*50)
 
     filename = f"/tmp/server_scan_{guild.id}.txt"
     with open(filename, "w", encoding="utf-8") as f:
         f.write("\n".join(output))
 
-    private_channel = discord.utils.get(guild.text_channels, name="private-bot-cmds")
-    if private_channel:
-        await private_channel.send(f"✅ Server scan complete! Total lines: {len(output)}", file=discord.File(filename))
-        await ctx.send(f"✅ Scan complete! Results sent to {private_channel.mention}")
-    else:
-        await ctx.send(f"⚠️ Could not find #private-bot-cmds channel. Sending here instead.", file=discord.File(filename))
+    private_ch = discord.utils.get(guild.text_channels, name="private-bot-cmds") or \
+                 discord.utils.get(guild.text_channels, name="{.Σ}-private-bot-cmds")
+    target_ch = private_ch or ctx.channel
+    await target_ch.send(f"✅ Scan complete! {len(output)} lines.", file=discord.File(filename))
+    if private_ch and private_ch != ctx.channel:
+        await ctx.send(f"✅ Scan sent to {private_ch.mention}")
 
     try:
         os.remove(filename)
@@ -443,9 +601,8 @@ async def scan(ctx):
 @bot.command()
 @commands.has_permissions(manage_messages=True)
 async def clear(ctx, amount: int = 10):
-    """Clear messages in current channel"""
     if amount > 100:
-        await ctx.send("❌ Cannot delete more than 100 messages at once!")
+        await ctx.send("❌ Max 100 messages at once.")
         return
     deleted = await ctx.channel.purge(limit=amount + 1)
     msg = await ctx.send(f"🗑️ Deleted {len(deleted)-1} messages!")
@@ -455,7 +612,6 @@ async def clear(ctx, amount: int = 10):
 @bot.command()
 @commands.has_permissions(kick_members=True)
 async def kick(ctx, member: discord.Member, *, reason="No reason provided"):
-    """Kick a member"""
     await member.kick(reason=reason)
     embed = discord.Embed(
         title="👢 Member Kicked",
@@ -467,7 +623,6 @@ async def kick(ctx, member: discord.Member, *, reason="No reason provided"):
 @bot.command()
 @commands.has_permissions(ban_members=True)
 async def ban(ctx, member: discord.Member, *, reason="No reason provided"):
-    """Ban a member"""
     await member.ban(reason=reason)
     embed = discord.Embed(
         title="🔨 Member Banned",
@@ -479,7 +634,6 @@ async def ban(ctx, member: discord.Member, *, reason="No reason provided"):
 @bot.command()
 @commands.has_permissions(ban_members=True)
 async def unban(ctx, user_id: int):
-    """Unban a user by ID"""
     user = await bot.fetch_user(user_id)
     await ctx.guild.unban(user)
     await ctx.send(f"✅ Unbanned **{user.name}**")
@@ -487,14 +641,12 @@ async def unban(ctx, user_id: int):
 @bot.command()
 @commands.has_permissions(manage_roles=True)
 async def addrole(ctx, member: discord.Member, role: discord.Role):
-    """Add a role to a member"""
     await member.add_roles(role)
     await ctx.send(f"✅ Added {role.mention} to {member.mention}")
 
 @bot.command()
 @commands.has_permissions(manage_roles=True)
 async def removerole(ctx, member: discord.Member, role: discord.Role):
-    """Remove a role from a member"""
     await member.remove_roles(role)
     await ctx.send(f"✅ Removed {role.mention} from {member.mention}")
 
@@ -503,9 +655,8 @@ async def removerole(ctx, member: discord.Member, role: discord.Role):
 # =========================
 @bot.command()
 async def serverinfo(ctx):
-    """Display server information"""
     guild = ctx.guild
-    embed = discord.Embed(title=f"📊 {guild.name}", color=discord.Color.blue())
+    embed = discord.Embed(title=f"📊 {guild.name}", color=EMBED_COLOR)
     embed.set_thumbnail(url=guild.icon.url if guild.icon else None)
     embed.add_field(name="👑 Owner", value=guild.owner.mention, inline=True)
     embed.add_field(name="👥 Members", value=guild.member_count, inline=True)
@@ -517,7 +668,6 @@ async def serverinfo(ctx):
 
 @bot.command()
 async def userinfo(ctx, member: discord.Member = None):
-    """Display user information"""
     member = member or ctx.author
     embed = discord.Embed(title=f"👤 {member.name}", color=member.color)
     embed.set_thumbnail(url=member.display_avatar.url)
@@ -526,31 +676,29 @@ async def userinfo(ctx, member: discord.Member = None):
     embed.add_field(name="📅 Account Created", value=f"<t:{int(member.created_at.timestamp())}:R>", inline=False)
     if member.joined_at:
         embed.add_field(name="📥 Joined Server", value=f"<t:{int(member.joined_at.timestamp())}:R>", inline=False)
-    roles = [role.mention for role in member.roles[1:]]
+    roles = [r.mention for r in member.roles[1:]]
     if roles:
         embed.add_field(name=f"🎭 Roles [{len(roles)}]", value=" ".join(roles[:10]), inline=False)
     await ctx.send(embed=embed)
 
 @bot.command()
 async def ping(ctx):
-    """Check bot latency"""
-    latency = round(bot.latency * 1000)
-    await ctx.send(f"🏓 Pong! Latency: **{latency}ms**")
+    await ctx.send(f"🏓 Pong! Latency: **{round(bot.latency * 1000)}ms**")
 
 # =========================
-# BOTCOMMANDS (was 'commands' - renamed to fix AttributeError crash)
+# BOTCOMMANDS
+# (renamed from 'commands' to avoid shadowing discord.ext.commands)
 # =========================
 @bot.command()
 async def botcommands(ctx):
-    """Display all commands"""
     embed = discord.Embed(
         title="🤖 {.Σ} Bot Commands",
         description="Here are all available commands:",
-        color=discord.Color.blue()
+        color=EMBED_COLOR
     )
     embed.add_field(
         name="👑 Owner Only",
-        value="`!build` - Build server structure\n`!wipe` - Wipe server\n`!updatechan #channel` - Rebuild channel\n`!fixperms <target>` - Fix permissions\n`!scan` - Scan server details\n`!shutdown` - Shut down bot",
+        value="`!build` - Build full server\n`!wipe` - Wipe server\n`!updatechan #channel` - Rebuild a channel\n`!fixperms <target>` - Fix permissions\n`!scan` - Scan server\n`!testjoin` - Test join event\n`!testleave` - Test leave event\n`!shutdown` - Shut down bot",
         inline=False
     )
     embed.add_field(
@@ -571,29 +719,26 @@ async def botcommands(ctx):
 @bot.command()
 @commands.is_owner()
 async def testjoin(ctx):
-    """Simulate a member joining"""
     await on_member_join(ctx.author)
     await ctx.send("✅ Simulated join event!")
 
 @bot.command()
 @commands.is_owner()
 async def testleave(ctx):
-    """Simulate a member leaving"""
     await on_member_remove(ctx.author)
     await ctx.send("✅ Simulated leave event!")
 
 # =========================
-# SHUTDOWN COMMAND
+# SHUTDOWN
 # =========================
 @bot.command()
 @commands.is_owner()
 async def shutdown(ctx):
-    """Shut down the bot"""
     await ctx.send("🔴 Shutting down bot... See you soon!")
     await bot.close()
 
 # =========================
-# START EVERYTHING
+# START
 # =========================
 keep_alive()
 bot.run(TOKEN)
