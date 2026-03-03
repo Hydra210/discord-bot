@@ -60,32 +60,23 @@ CHANNEL_EMBEDS = {
 
 # Suggestions forum format guide shown as the first post in the forum
 SUGGESTIONS_GUIDE = """ **📌 READ BEFORE POSTING — FORMAT**
-
 Before posting, make sure your suggestion follows this format:
-
 **Title:** Give your suggestion a short, clear title.
-
 **Description:**
 A clear explanation of your suggestion. What is it? How would it work?
-
 **Why it would help:**
 Why should we add this? How does it benefit the server or community?
-
 **Examples (optional):**
 Any examples, references, or screenshots that help explain your idea.
-
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
  **DO:**
 - Be specific and detailed
 - Keep it respectful and constructive
 - Check if your suggestion already exists before posting
-
  **DON'T:**
 - Post duplicate suggestions
 - Be rude or dismissive of others' ideas
 - Post anything unrelated to the server or community
-
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 All suggestions are reviewed by staff. We appreciate every idea! """
 
@@ -698,11 +689,22 @@ async def build(ctx):
             discord.ForumTag(name="👀 Under Review"),
         ]
     )
-    await suggestions_ch.create_thread(
-        name="📋 READ BEFORE POSTING — Suggestion Format Guide",
-        content=SUGGESTIONS_GUIDE,
-        auto_archive_duration=10080,
-    )
+    sug_embed = discord.Embed(description=SUGGESTIONS_GUIDE, color=EMBED_COLOR)
+    sug_embed.set_image(url="attachment://banner.png")
+    try:
+        sug_file = discord.File(BANNER_FILE, filename="banner.png")
+        await suggestions_ch.create_thread(
+            name="📋 READ BEFORE POSTING — Suggestion Format Guide",
+            embed=sug_embed,
+            file=sug_file,
+            auto_archive_duration=10080,
+        )
+    except FileNotFoundError:
+        await suggestions_ch.create_thread(
+            name="📋 READ BEFORE POSTING — Suggestion Format Guide",
+            embed=sug_embed,
+            auto_archive_duration=10080,
+        )
 
     # MEDIA ZONE
     media_ow = {
@@ -1208,11 +1210,22 @@ async def bb_build_one(guild, ch_name, cat_name, ow_type, roles):
                 discord.ForumTag(name="👀 Under Review"),
             ]
         )
-        await forum.create_thread(
-            name="📋 READ BEFORE POSTING — Suggestion Format Guide",
-            content=SUGGESTIONS_GUIDE,
-            auto_archive_duration=10080,
-        )
+        sug_embed = discord.Embed(description=SUGGESTIONS_GUIDE, color=EMBED_COLOR)
+        sug_embed.set_image(url="attachment://banner.png")
+        try:
+            sug_file = discord.File(BANNER_FILE, filename="banner.png")
+            await forum.create_thread(
+                name="📋 READ BEFORE POSTING — Suggestion Format Guide",
+                embed=sug_embed,
+                file=sug_file,
+                auto_archive_duration=10080,
+            )
+        except FileNotFoundError:
+            await forum.create_thread(
+                name="📋 READ BEFORE POSTING — Suggestion Format Guide",
+                embed=sug_embed,
+                auto_archive_duration=10080,
+            )
         return forum
 
     # Normal text channel
@@ -1468,4 +1481,3 @@ async def bb(ctx):
 # =========================
 keep_alive()
 bot.run(TOKEN)
-
