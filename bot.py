@@ -11,6 +11,7 @@ import asyncio
 TOKEN = os.getenv("DISCORD_TOKEN")
 
 intents = discord.Intents.all()
+intents.members = True  # explicitly required for on_member_join/remove to fire
 bot = commands.Bot(command_prefix="!", intents=intents)
 
 DIVIDER = "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -94,20 +95,22 @@ def keep_alive():
 
 # =========================
 # HELPER: SEND BANNER
+# Always sends from repo root banner.png as a fresh File object each time.
+# Discord requires a new File() instance per send — you can't reuse one.
 # =========================
 async def send_banner(channel):
-    if os.path.exists(BANNER_FILE):
-        await channel.send(file=discord.File(BANNER_FILE))
+    await channel.send(file=discord.File(BANNER_FILE))
 
 # =========================
 # HELPER: BUILD CHANNEL EMBED
+# Sends banner.png first, then the embed below it as a separate message.
+# This is used for channel setup/updatechan only.
 # =========================
 async def send_channel_embed(channel, channel_key=None):
-    """Send the correct embed for a channel. channel_key is the name without {.Σ}- prefix."""
     if channel_key is None:
         channel_key = channel.name.replace("{.Σ}-", "").replace("{.σ}-", "")
-
     description = CHANNEL_EMBEDS.get(channel_key, f"Welcome to {channel.name}. Keep it clean and follow the rules.")
+    await send_banner(channel)
     embed = discord.Embed(description=description, color=EMBED_COLOR)
     await channel.send(embed=embed)
 
@@ -130,20 +133,21 @@ async def on_ready():
 async def on_member_join(member):
     guild = member.guild
 
-    # --- WELCOME CHANNEL: banner + join notification embed ---
+    # --- WELCOME CHANNEL ---
+    # Banner is already pinned at top from channel setup.
+    # Just send the individual player join embed, no banner here.
     welcome_channel = discord.utils.get(guild.text_channels, name="{.Σ}-welcome")
     if welcome_channel:
-        await send_banner(welcome_channel)
         embed = discord.Embed(
-            title=f"👋 {member.name} just joined the server!",
+            title=f"👋 {member.name} just joined!",
             description=(
                 f"Hey {member.mention}, welcome to **{guild.name}**! 🎉\n\n"
-                f"Make sure you read the rules and get verified to unlock the full server."
+                f"Please read the rules and get verified to unlock the full server."
             ),
             color=discord.Color.green()
         )
         embed.set_thumbnail(url=member.display_avatar.url)
-        embed.add_field(name="📋 Rules", value="Head to <#rules> before anything else.", inline=True)
+        embed.add_field(name="📋 Rules", value="Head to the rules channel first.", inline=True)
         embed.add_field(name="✅ Verification", value="Get verified to unlock all channels.", inline=True)
         embed.set_footer(
             text=f"Member #{guild.member_count}",
@@ -153,7 +157,8 @@ async def on_member_join(member):
         await welcome_channel.send(embed=embed)
         await welcome_channel.send(DIVIDER)
 
-    # --- JOINS CHANNEL: banner + join log embed ---
+    # --- JOINS CHANNEL ---
+    # Banner first, then embed below it.
     joins_channel = discord.utils.get(guild.text_channels, name="{.Σ}-joins")
     if joins_channel:
         await send_banner(joins_channel)
@@ -170,7 +175,7 @@ async def on_member_join(member):
         await joins_channel.send(embed=embed)
         await joins_channel.send(DIVIDER)
 
-    # --- LOGS CHANNEL: staff join log ---
+    # --- LOGS CHANNEL ---
     logs = discord.utils.get(guild.text_channels, name="{.Σ}-logs")
     if logs:
         embed = discord.Embed(
@@ -191,7 +196,8 @@ async def on_member_join(member):
 async def on_member_remove(member):
     guild = member.guild
 
-    # --- LEAVES CHANNEL: banner + leave embed ---
+    # --- LEAVES CHANNEL ---
+    # Banner first, then embed below it.
     leaves_channel = discord.utils.get(guild.text_channels, name="{.Σ}-leaves")
     if leaves_channel:
         await send_banner(leaves_channel)
@@ -208,7 +214,7 @@ async def on_member_remove(member):
         await leaves_channel.send(embed=embed)
         await leaves_channel.send(DIVIDER)
 
-    # --- LOGS CHANNEL: staff leave log ---
+    # --- LOGS CHANNEL ---
     logs = discord.utils.get(guild.text_channels, name="{.Σ}-logs")
     if logs:
         embed = discord.Embed(
