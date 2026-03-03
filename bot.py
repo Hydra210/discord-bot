@@ -37,7 +37,9 @@ CHANNEL_EMBEDS = {
     "questions":         "❓ Have a question about the server, game, or community? Ask here!",
     "hall-of-shame":     "😬 Post your most embarrassing moments, worst fails, and biggest L's here. Keep it fun, not personal attacks!",
     "bot-commands":      "🤖 Use all bot commands in this channel to keep other channels clean.",
-    "community-codes":   "🎁 Community codes and giveaways are dropped here. Stay active to catch them!",
+    "community-codes":   "🎁 Got any codes You want to share? post them here.",
+    "joins":             "📥 Member join logs are recorded here automatically.",
+    "leaves":            "📤 Member leave logs are recorded here automatically.",
     "roblox-chat":       "🎮 Talk about Roblox games, updates, and anything Roblox related here!",
     "game-suggestions":  "💡 Got an idea for a game or feature? Drop your suggestions here!",
     "looking-to-play":   "🕹️ Looking for someone to play with? Post here and find a squad!",
@@ -52,10 +54,19 @@ CHANNEL_EMBEDS = {
     "staff-chat":        "🛡️ Staff only chat. Keep discussions professional and on-topic.",
     "mod-logs":          "📋 Automated moderation logs are recorded here.",
     "admin-only":        "⚙️ Admin-only channel for important decisions and high-level management.",
-    "joins":             "📥 Member join logs are recorded here automatically.",
-    "leaves":            "📤 Member leave logs are recorded here automatically.",
     "private-bot-cmds":  "🤖 Private channel for owner bot commands only.",
+    "logs":              "📋 Server logs are recorded here automatically.",
 }
+
+# =========================
+# HELPER: FIND CHANNEL BY NAME
+# Searches by exact name since channels have no prefix.
+# =========================
+def find_channel(guild, name):
+    for ch in guild.text_channels:
+        if ch.name == name:
+            return ch
+    return None
 
 # =========================
 # KEEP ALIVE WEB SERVER
@@ -90,7 +101,7 @@ async def send_banner(channel):
 # =========================
 async def send_channel_embed(channel, channel_key=None):
     if channel_key is None:
-        channel_key = channel.name.replace("{.Σ}-", "").replace("{.σ}-", "")
+        channel_key = channel.name
     description = CHANNEL_EMBEDS.get(channel_key, f"Welcome to {channel.name}. Keep it clean and follow the rules.")
     await send_banner(channel)
     embed = discord.Embed(description=description, color=EMBED_COLOR)
@@ -114,8 +125,8 @@ async def on_member_join(member):
     print(f"[JOIN EVENT] {member.name} joined {member.guild.name}")
     guild = member.guild
 
-    # WELCOME CHANNEL - no banner, just the player join embed
-    welcome_channel = discord.utils.get(guild.text_channels, name="{.Σ}-welcome")
+    # WELCOME CHANNEL - no banner, just player join embed
+    welcome_channel = find_channel(guild, "welcome")
     if welcome_channel:
         print(f"[JOIN EVENT] Sending to welcome channel")
         embed = discord.Embed(
@@ -140,7 +151,7 @@ async def on_member_join(member):
         print(f"[JOIN EVENT] Welcome channel not found!")
 
     # JOINS CHANNEL - banner first then embed
-    joins_channel = discord.utils.get(guild.text_channels, name="{.Σ}-joins")
+    joins_channel = find_channel(guild, "joins")
     if joins_channel:
         print(f"[JOIN EVENT] Sending to joins channel")
         await send_banner(joins_channel)
@@ -160,7 +171,7 @@ async def on_member_join(member):
         print(f"[JOIN EVENT] Joins channel not found!")
 
     # LOGS CHANNEL
-    logs = discord.utils.get(guild.text_channels, name="{.Σ}-logs")
+    logs = find_channel(guild, "logs")
     if logs:
         embed = discord.Embed(
             title="✅ Member Joined",
@@ -182,7 +193,7 @@ async def on_member_remove(member):
     guild = member.guild
 
     # LEAVES CHANNEL - banner first then embed
-    leaves_channel = discord.utils.get(guild.text_channels, name="{.Σ}-leaves")
+    leaves_channel = find_channel(guild, "leaves")
     if leaves_channel:
         print(f"[LEAVE EVENT] Sending to leaves channel")
         await send_banner(leaves_channel)
@@ -202,7 +213,7 @@ async def on_member_remove(member):
         print(f"[LEAVE EVENT] Leaves channel not found!")
 
     # LOGS CHANNEL
-    logs = discord.utils.get(guild.text_channels, name="{.Σ}-logs")
+    logs = find_channel(guild, "logs")
     if logs:
         embed = discord.Embed(
             title="❌ Member Left",
@@ -223,7 +234,7 @@ async def on_member_remove(member):
 async def on_message_delete(message):
     if message.author.bot:
         return
-    logs = discord.utils.get(message.guild.text_channels, name="{.Σ}-logs")
+    logs = find_channel(message.guild, "logs")
     if logs:
         embed = discord.Embed(
             title="🗑️ Message Deleted",
@@ -288,7 +299,7 @@ async def build(ctx):
         owner_r:      ow(read=True, send=True, history=True),
     }
     verify_cat = await guild.create_category("{.Σ} ───── VERIFICATION ─────", overwrites=verify_ow)
-    ch = await guild.create_text_channel("{.Σ}-verification", category=verify_cat, overwrites=verify_ow)
+    ch = await guild.create_text_channel("verification", category=verify_cat, overwrites=verify_ow)
     await send_channel_embed(ch, "verification")
 
     logs_ow = {
@@ -298,81 +309,81 @@ async def build(ctx):
         owner_r: ow(read=True, send=True, history=True),
     }
     logs_cat = await guild.create_category("{.Σ} ───── LOGS ─────", overwrites=logs_ow)
-    await guild.create_text_channel("{.Σ}-logs", category=logs_cat, overwrites=logs_ow)
+    await guild.create_text_channel("logs", category=logs_cat, overwrites=logs_ow)
 
     # INFORMATION
     info_ow = {
-        ev:        ow(read=False, send=False, history=False),
+        ev:         ow(read=False, send=False, history=False),
         verified_r: ow(read=True, send=False, history=True),
-        mod_r:     ow(read=True, send=True, history=True),
-        admin_r:   ow(read=True, send=True, history=True),
-        owner_r:   ow(read=True, send=True, history=True),
+        mod_r:      ow(read=True, send=True, history=True),
+        admin_r:    ow(read=True, send=True, history=True),
+        owner_r:    ow(read=True, send=True, history=True),
     }
     info_cat = await guild.create_category("{.Σ} ───── INFORMATION ─────", overwrites=info_ow)
     for ch_name in ["welcome", "rules", "announcements", "updates"]:
-        ch = await guild.create_text_channel(f"{{.Σ}}-{ch_name}", category=info_cat, overwrites=info_ow)
+        ch = await guild.create_text_channel(ch_name, category=info_cat, overwrites=info_ow)
         await send_channel_embed(ch, ch_name)
 
     # LINKS
     links_ow = {
-        ev:        ow(read=False, send=False, history=False),
+        ev:         ow(read=False, send=False, history=False),
         verified_r: ow(read=True, send=False, history=True),
-        mod_r:     ow(read=True, send=True, history=True),
-        admin_r:   ow(read=True, send=True, history=True),
-        owner_r:   ow(read=True, send=True, history=True),
+        mod_r:      ow(read=True, send=True, history=True),
+        admin_r:    ow(read=True, send=True, history=True),
+        owner_r:    ow(read=True, send=True, history=True),
     }
     links_cat = await guild.create_category("{.Σ} ───── LINKS ─────", overwrites=links_ow)
     for ch_name in ["roblox-group", "game-links", "my-profile", "youtube-links"]:
-        ch = await guild.create_text_channel(f"{{.Σ}}-{ch_name}", category=links_cat, overwrites=links_ow)
+        ch = await guild.create_text_channel(ch_name, category=links_cat, overwrites=links_ow)
         await send_channel_embed(ch, ch_name)
 
     # COMMUNITY
     community_ow = {
-        ev:        ow(read=False, history=False),
+        ev:         ow(read=False, history=False),
         verified_r: ow(read=True, send=True, history=True),
-        mod_r:     ow(read=True, send=True, history=True),
-        admin_r:   ow(read=True, send=True, history=True),
-        owner_r:   ow(read=True, send=True, history=True),
+        mod_r:      ow(read=True, send=True, history=True),
+        admin_r:    ow(read=True, send=True, history=True),
+        owner_r:    ow(read=True, send=True, history=True),
     }
     community_readonly_ow = {
-        ev:        ow(read=False, send=False, history=False),
+        ev:         ow(read=False, send=False, history=False),
         verified_r: ow(read=True, send=False, history=True),
-        mod_r:     ow(read=True, send=True, history=True),
-        admin_r:   ow(read=True, send=True, history=True),
-        owner_r:   ow(read=True, send=True, history=True),
+        mod_r:      ow(read=True, send=True, history=True),
+        admin_r:    ow(read=True, send=True, history=True),
+        owner_r:    ow(read=True, send=True, history=True),
     }
     community_cat = await guild.create_category("{.Σ} ───── COMMUNITY ─────", overwrites=community_ow)
-    for ch_name in ["general", "memes", "polls", "questions", "community-codes"]:
-        ch = await guild.create_text_channel(f"{{.Σ}}-{ch_name}", category=community_cat, overwrites=community_ow)
+    for ch_name in ["general", "memes", "polls", "questions", "community-codes", "joins", "leaves"]:
+        ch = await guild.create_text_channel(ch_name, category=community_cat, overwrites=community_ow)
         await send_channel_embed(ch, ch_name)
     for ch_name in ["hall-of-shame", "bot-commands"]:
-        ch = await guild.create_text_channel(f"{{.Σ}}-{ch_name}", category=community_cat, overwrites=community_readonly_ow)
+        ch = await guild.create_text_channel(ch_name, category=community_cat, overwrites=community_readonly_ow)
         await send_channel_embed(ch, ch_name)
 
     # GAMING
     gaming_ow = {
-        ev:        ow(read=False, history=False),
+        ev:         ow(read=False, history=False),
         verified_r: ow(read=True, send=True, history=True),
-        mod_r:     ow(read=True, send=True, history=True),
-        admin_r:   ow(read=True, send=True, history=True),
-        owner_r:   ow(read=True, send=True, history=True),
+        mod_r:      ow(read=True, send=True, history=True),
+        admin_r:    ow(read=True, send=True, history=True),
+        owner_r:    ow(read=True, send=True, history=True),
     }
     gaming_cat = await guild.create_category("{.Σ} ───── GAMING ─────", overwrites=gaming_ow)
     for ch_name in ["roblox-chat", "game-suggestions", "looking-to-play"]:
-        ch = await guild.create_text_channel(f"{{.Σ}}-{ch_name}", category=gaming_cat, overwrites=gaming_ow)
+        ch = await guild.create_text_channel(ch_name, category=gaming_cat, overwrites=gaming_ow)
         await send_channel_embed(ch, ch_name)
 
     # MEDIA ZONE
     media_ow = {
-        ev:        ow(read=False, history=False),
+        ev:         ow(read=False, history=False),
         verified_r: ow(read=True, send=True, history=True),
-        mod_r:     ow(read=True, send=True, history=True),
-        admin_r:   ow(read=True, send=True, history=True),
-        owner_r:   ow(read=True, send=True, history=True),
+        mod_r:      ow(read=True, send=True, history=True),
+        admin_r:    ow(read=True, send=True, history=True),
+        owner_r:    ow(read=True, send=True, history=True),
     }
     media_cat = await guild.create_category("{.Σ} ───── MEDIA ZONE ─────", overwrites=media_ow)
     for ch_name in ["photos", "videos", "clips", "artwork", "music", "selfies", "edits", "stream-highlights"]:
-        ch = await guild.create_text_channel(f"{{.Σ}}-{ch_name}", category=media_cat, overwrites=media_ow)
+        ch = await guild.create_text_channel(ch_name, category=media_cat, overwrites=media_ow)
         await send_channel_embed(ch, ch_name)
 
     # STAFF
@@ -382,19 +393,9 @@ async def build(ctx):
         admin_r: ow(read=True, send=True, history=True),
         owner_r: ow(read=True, send=True, history=True),
     }
-    staff_visible_ow = {
-        ev:        ow(read=False, history=False),
-        verified_r: ow(read=True, send=False, history=True),
-        mod_r:     ow(read=True, send=True, history=True),
-        admin_r:   ow(read=True, send=True, history=True),
-        owner_r:   ow(read=True, send=True, history=True),
-    }
     staff_cat = await guild.create_category("{.Σ} ───── STAFF ─────", overwrites=staff_ow)
     for ch_name in ["staff-chat", "mod-logs", "admin-only", "private-bot-cmds"]:
-        ch = await guild.create_text_channel(f"{{.Σ}}-{ch_name}", category=staff_cat, overwrites=staff_ow)
-        await send_channel_embed(ch, ch_name)
-    for ch_name in ["joins", "leaves"]:
-        ch = await guild.create_text_channel(f"{{.Σ}}-{ch_name}", category=staff_cat, overwrites=staff_visible_ow)
+        ch = await guild.create_text_channel(ch_name, category=staff_cat, overwrites=staff_ow)
         await send_channel_embed(ch, ch_name)
 
     await ctx.send("✅ Full server setup complete!")
@@ -441,7 +442,7 @@ async def updatechan(ctx, channel: discord.TextChannel):
         deleted = await channel.purge(limit=None)
         if channel.category:
             await channel.edit(sync_permissions=True)
-        ch_key = channel.name.replace("{.Σ}-", "").replace("{.σ}-", "")
+        ch_key = channel.name
         if ch_key not in CHANNEL_EMBEDS:
             await msg.edit(content=f"⚠️ Cleared {channel.mention} ({len(deleted)} messages) but `{ch_key}` has no entry in CHANNEL_EMBEDS.")
             return
@@ -473,7 +474,7 @@ async def fixperms(ctx, *, target=None):
         try:
             await ch.set_permissions(ctx.guild.default_role, read_messages=True, read_message_history=True)
             await ch.set_permissions(unverified_r, read_messages=False, read_message_history=False)
-            if "welcome" in ch.name or "verification" in ch.name:
+            if ch.name in ["welcome", "verification"]:
                 await ch.set_permissions(unverified_r, read_messages=True, read_message_history=True)
             await msg.edit(content=f"✅ Fixed permissions for {ch.mention}")
         except Exception as e:
@@ -489,7 +490,7 @@ async def fixperms(ctx, *, target=None):
                 try:
                     await ch.set_permissions(ctx.guild.default_role, read_messages=True, read_message_history=True)
                     await ch.set_permissions(unverified_r, read_messages=False, read_message_history=False)
-                    if "welcome" in ch.name or "verification" in ch.name:
+                    if ch.name in ["welcome", "verification"]:
                         await ch.set_permissions(unverified_r, read_messages=True, read_message_history=True)
                     fixed_count += 1
                 except Exception as e:
@@ -568,7 +569,7 @@ async def scan(ctx):
     with open(filename, "w", encoding="utf-8") as f:
         f.write("\n".join(output))
 
-    private_ch = discord.utils.get(guild.text_channels, name="{.Σ}-private-bot-cmds")
+    private_ch = find_channel(guild, "private-bot-cmds")
     target_ch = private_ch or ctx.channel
     await target_ch.send(f"✅ Scan complete! {len(output)} lines.", file=discord.File(filename))
     if private_ch and private_ch != ctx.channel:
