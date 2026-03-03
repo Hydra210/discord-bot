@@ -56,36 +56,32 @@ async def on_member_join(member):
     channel = discord.utils.get(member.guild.text_channels, name="joins")
     if not channel:
         return
+    
     # 1 Banner
     await send_banner(channel)
-    # 2 Embed
+    
+    # 2 Welcome Embed
     embed = discord.Embed(
-        title=f"Welcome {member.mention} to {member.guild.name}",
-        color=discord.Color.dark_grey()
-    )
-    embed.set_author(
-        name="Member Joined",
-        icon_url=member.display_avatar.url
-    )
-    embed.add_field(
-        name="Account Created",
-        value=f"<t:{int(member.created_at.timestamp())}:R>",
-        inline=False
-    )
-    embed.add_field(
-        name="Member Count",
-        value=str(member.guild.member_count),
-        inline=False
-    )
-    embed.add_field(
-        name="User ID",
-        value=str(member.id),
-        inline=False
+        title=f"🎉 Welcome to {member.guild.name}!",
+        description=f"Hey {member.mention}! We're glad you're here. Make yourself at home!",
+        color=discord.Color.green()
     )
     embed.set_thumbnail(url=member.display_avatar.url)
-    embed.set_footer(text=f"{member.guild.name} • New Arrival")
+    embed.add_field(
+        name="👋 You're our member #",
+        value=str(member.guild.member_count),
+        inline=True
+    )
+    embed.add_field(
+        name="📅 Account Age",
+        value=f"<t:{int(member.created_at.timestamp())}:R>",
+        inline=True
+    )
+    embed.set_footer(text=f"Welcome aboard! • {member.guild.name}", icon_url=member.guild.icon.url if member.guild.icon else None)
     embed.timestamp = discord.utils.utcnow()
+    
     await channel.send(embed=embed)
+    
     # 3 Divider
     await channel.send(DIVIDER)
 
@@ -97,37 +93,36 @@ async def on_member_remove(member):
     channel = discord.utils.get(member.guild.text_channels, name="leaves")
     if not channel:
         return
+    
     # 1 Banner
     await send_banner(channel)
-    # 2 Embed
+    
+    # 2 Goodbye Embed
     embed = discord.Embed(
-        title=f"{member.name} has left {member.guild.name}",
-        color=discord.Color.dark_gray()
-    )
-    embed.set_author(
-        name="Member Left",
-        icon_url=member.display_avatar.url
-    )
-    if member.joined_at:
-        embed.add_field(
-            name="Joined Server",
-            value=f"<t:{int(member.joined_at.timestamp())}:R>",
-            inline=False
-        )
-    embed.add_field(
-        name="Members Remaining",
-        value=str(member.guild.member_count),
-        inline=False
-    )
-    embed.add_field(
-        name="User ID",
-        value=str(member.id),
-        inline=False
+        title=f"👋 {member.name} has left",
+        description=f"We'll miss you! Thanks for being part of {member.guild.name}.",
+        color=discord.Color.red()
     )
     embed.set_thumbnail(url=member.display_avatar.url)
-    embed.set_footer(text=f"{member.guild.name} • Departure Logged")
+    
+    if member.joined_at:
+        embed.add_field(
+            name="⏱️ Time with us",
+            value=f"Joined <t:{int(member.joined_at.timestamp())}:R>",
+            inline=True
+        )
+    
+    embed.add_field(
+        name="👥 Members now",
+        value=str(member.guild.member_count),
+        inline=True
+    )
+    
+    embed.set_footer(text=f"Goodbye! • {member.guild.name}", icon_url=member.guild.icon.url if member.guild.icon else None)
     embed.timestamp = discord.utils.utcnow()
+    
     await channel.send(embed=embed)
+    
     # 3 Divider
     await channel.send(DIVIDER)
 
@@ -143,6 +138,15 @@ async def testjoin(ctx):
 async def testleave(ctx):
     await on_member_remove(ctx.author)
     await ctx.send("Simulated leave.")
+
+# ===============================
+# SHUTDOWN COMMAND (OWNER ONLY)
+# ===============================
+@bot.command()
+@commands.is_owner()
+async def shutdown(ctx):
+    await ctx.send("🔴 Shutting down bot... See you soon!")
+    await bot.close()
 
 # ===============================
 # RUN BOT
