@@ -676,7 +676,7 @@ async def ping(ctx):
     await ctx.send(f"🏓 Pong! Latency: **{latency}ms**")
 
 @bot.command()
-async def help(ctx):
+async def commands(ctx):
     """Display all commands"""
     embed = discord.Embed(
         title="🤖 {.Σ} Bot Commands",
@@ -698,7 +698,7 @@ async def help(ctx):
     
     embed.add_field(
         name="📊 Info",
-        value="`!serverinfo` - Server stats\n`!userinfo [@user]` - User info\n`!ping` - Check latency",
+        value="`!serverinfo` - Server stats\n`!userinfo [@user]` - User info\n`!ping` - Check latency\n`!commands` - Show this message",
         inline=False
     )
     
