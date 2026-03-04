@@ -1204,13 +1204,13 @@ async def _build_smart_embed(link_type, identifier, original_url):
             e.set_image(url=banner_url)
         e.set_footer(text="Discord Server")
 
-        # Green Join button
+        # Clean green Join button — renders below the embed (outside it) by Discord design
         view = discord.ui.View()
         view.add_item(discord.ui.Button(
             label="Join Server",
             style=discord.ButtonStyle.green,
             url=invite_url,
-            emoji="\U0001f4e8"
+            emoji="📨"
         ))
         return e, view
 
