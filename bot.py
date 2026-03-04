@@ -5,6 +5,7 @@ from threading import Thread
 import os
 import asyncio
 import aiohttp
+import re
 
 # =========================
 # TOKEN FROM RENDER ENV
@@ -32,6 +33,7 @@ CHANNEL_EMBEDS = {
     "game-links":        "🕹️ Links to all of our Roblox games are pinned here. Jump in and play!",
     "my-profile":        "👤 Links to our creator's Roblox profile and social pages are pinned here.",
     "youtube-links":     "▶️ Our YouTube videos and content drops are linked here. Go watch and subscribe!",
+    "server-partnerships": "🤝 Official server partnerships are listed here. Check out our partner servers!",
     "general":           "💬 The main hangout spot. Talk about anything and everything here!",
     "memes":             "😂 Post the funniest memes you find. Keep it appropriate!",
     "polls":             "📊 Community polls are posted here. Vote and make your voice heard!",
@@ -585,7 +587,7 @@ async def build(ctx):
         owner_r:    ow(read=True, send=True, history=True),
     }
     links_cat = await guild.create_category("{.Σ} ───── LINKS ─────", overwrites=links_ow)
-    for ch_name in ["roblox-group", "game-links", "my-profile", "youtube-links"]:
+    for ch_name in ["roblox-group", "game-links", "my-profile", "youtube-links", "server-partnerships"]:
         ch = await guild.create_text_channel(ch_name, category=links_cat, overwrites=links_ow)
         await send_channel_embed(ch, ch_name)
 
@@ -1031,13 +1033,151 @@ async def botcommands(ctx):
     await ctx.send(embed=embed)
 
 
+
+# =========================
+# SMART LINK HELPERS (for !bm)
+# =========================
+
+async def fetch_discord_invite(code):
+    """Fetch Discord invite info via public API."""
+    url = f"https://discord.com/api/v9/invites/{code}?with_counts=true"
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, headers={"User-Agent": "DiscordBot (custom, 1.0)"}) as resp:
+                if resp.status == 200:
+                    return await resp.json()
+    except Exception as e:
+        print(f"[SmartEmbed] fetch_discord_invite error: {e}")
+    return None
+
+def _detect_link(text):
+    """
+    Returns (link_type, identifier) or (None, None).
+    Types: 'roblox_game', 'roblox_user', 'roblox_group', 'discord_invite'
+    identifier: the ID or invite code string
+    """
+    # Roblox game:  roblox.com/games/PLACEID
+    m = re.search(r"roblox\.com/games/(\d+)", text, re.IGNORECASE)
+    if m:
+        return "roblox_game", m.group(1)
+
+    # Roblox user:  roblox.com/users/USERID
+    m = re.search(r"roblox\.com/users/(\d+)", text, re.IGNORECASE)
+    if m:
+        return "roblox_user", m.group(1)
+
+    # Roblox group: roblox.com/communities/GROUPID or roblox.com/groups/GROUPID
+    m = re.search(r"roblox\.com/(?:communities|groups)/(\d+)", text, re.IGNORECASE)
+    if m:
+        return "roblox_group", m.group(1)
+
+    # Discord invite: discord.gg/CODE or discord.com/invite/CODE
+    m = re.search(r"discord(?:\.gg|\.com/invite)/([A-Za-z0-9\-]+)", text, re.IGNORECASE)
+    if m:
+        return "discord_invite", m.group(1)
+
+    return None, None
+
+
+async def _build_smart_embed(link_type, identifier, original_url):
+    """Build a rich embed for a detected link. Returns discord.Embed or None."""
+    if link_type == "roblox_game":
+        # Convert place ID to universe ID first
+        universe_id = await fetch_universe_id(identifier)
+        if not universe_id:
+            return None
+        game  = await fetch_roblox_game(universe_id)
+        thumb = await fetch_roblox_thumbnail(universe_id)
+        banner = await fetch_roblox_game_banner(universe_id)
+        if not game:
+            return None
+        e = discord.Embed(
+            title=game.get("name", "Unknown Game"),
+            description=game.get("description", "No description available."),
+            url=original_url,
+            color=EMBED_COLOR
+        )
+        e.add_field(name="\U0001f465 Active Players", value=f"{game.get('playing', 0):,}", inline=True)
+        e.add_field(name="\U0001f441\ufe0f Visits",   value=f"{game.get('visits', 0):,}", inline=True)
+        e.add_field(name="\U0001f44d Favorites",      value=f"{game.get('favoritedCount', 0):,}", inline=True)
+        if thumb:
+            e.set_thumbnail(url=thumb)
+        if banner:
+            e.set_image(url=banner)
+        e.set_footer(text="Roblox Game")
+        return e
+
+    elif link_type == "roblox_user":
+        user   = await fetch_roblox_user(identifier)
+        avatar = await fetch_roblox_avatar(identifier)
+        if not user:
+            return None
+        e = discord.Embed(
+            title=user.get("displayName", "Unknown"),
+            description=user.get("description", "No bio available."),
+            url=original_url,
+            color=EMBED_COLOR
+        )
+        e.add_field(name="Username", value=f"@{user.get('name', 'Unknown')}", inline=True)
+        if avatar:
+            e.set_thumbnail(url=avatar)
+        e.set_footer(text="Roblox Profile")
+        return e
+
+    elif link_type == "roblox_group":
+        group = await fetch_roblox_group(identifier)
+        icon  = await fetch_roblox_group_icon(identifier)
+        if not group:
+            return None
+        e = discord.Embed(
+            title=group.get("name", "Unknown Group"),
+            description=group.get("description", "No description available."),
+            url=original_url,
+            color=EMBED_COLOR
+        )
+        e.add_field(name="\U0001f465 Members", value=f"{group.get('memberCount', 0):,}", inline=True)
+        if icon:
+            e.set_thumbnail(url=icon)
+        e.set_footer(text="Roblox Group")
+        return e
+
+    elif link_type == "discord_invite":
+        data = await fetch_discord_invite(identifier)
+        if not data:
+            return None
+        guild_data = data.get("guild", {})
+        name       = guild_data.get("name", "Unknown Server")
+        desc       = guild_data.get("description") or "No description available."
+        members    = data.get("approximate_member_count", 0)
+        online     = data.get("approximate_presence_count", 0)
+        icon_hash  = guild_data.get("icon")
+        guild_id   = guild_data.get("id")
+        icon_url   = f"https://cdn.discordapp.com/icons/{guild_id}/{icon_hash}.png" if icon_hash and guild_id else None
+        invite_url = f"https://discord.gg/{identifier}"
+
+        e = discord.Embed(
+            title=f"\U0001f4e8 {name}",
+            description=desc,
+            url=invite_url,
+            color=EMBED_COLOR
+        )
+        e.add_field(name="\U0001f465 Members", value=f"{members:,}", inline=True)
+        e.add_field(name="\U0001f7e2 Online",  value=f"{online:,}", inline=True)
+        if icon_url:
+            e.set_thumbnail(url=icon_url)
+        e.set_footer(text="Discord Server")
+        return e
+
+    return None
+
+
 # =========================
 # BOT MESSAGE CREATOR
 # =========================
 @bot.command()
 @commands.is_owner()
 async def bm(ctx):
-    """Interactive bot message builder with 4 message types."""
+    """Interactive bot message builder with 4 message types + smart link embeds."""
 
     TYPE_EMOJIS = ["\u0031\ufe0f\u20e3", "\u0032\ufe0f\u20e3", "\u0033\ufe0f\u20e3", "\u0034\ufe0f\u20e3"]
 
@@ -1055,59 +1195,80 @@ async def bm(ctx):
         except asyncio.TimeoutError:
             return None, None
 
-    async def do_send(channel, msg_type, message_content, description_text=None):
+    async def do_send(channel, msg_type, message_content, description_text=None, smart_embed=None):
+        """Send the final message to the target channel."""
+        # Determine the main embed to use
+        def make_plain():
+            return discord.Embed(description=message_content, color=EMBED_COLOR)
+
+        main_embed = smart_embed if smart_embed else make_plain()
+
         if msg_type == 1:
-            e = discord.Embed(description=message_content, color=EMBED_COLOR)
-            await channel.send(embed=e)
+            await channel.send(embed=main_embed)
+
         elif msg_type == 2:
             try:
                 await channel.send(file=discord.File(BANNER_FILE))
             except FileNotFoundError:
                 pass
             await channel.send(embed=discord.Embed(description=description_text, color=EMBED_COLOR))
-            await channel.send(embed=discord.Embed(description=message_content, color=EMBED_COLOR))
+            await channel.send(embed=main_embed)
+
         elif msg_type == 3:
-            e = discord.Embed(description=message_content, color=EMBED_COLOR)
-            e.set_image(url="attachment://banner.png")
+            # Banner inside the embed as image at bottom
+            # Only add set_image if smart_embed didn't already set one
+            if not smart_embed:
+                main_embed.set_image(url="attachment://banner.png")
             try:
-                await channel.send(embed=e, file=discord.File(BANNER_FILE, filename="banner.png"))
+                await channel.send(embed=main_embed, file=discord.File(BANNER_FILE, filename="banner.png"))
             except FileNotFoundError:
-                await channel.send(embed=e)
+                await channel.send(embed=main_embed)
+
         elif msg_type == 4:
             try:
                 await channel.send(file=discord.File(BANNER_FILE))
             except FileNotFoundError:
                 pass
-            await channel.send(embed=discord.Embed(description=message_content, color=EMBED_COLOR))
+            await channel.send(embed=main_embed)
 
-    async def do_preview(msg_type, message_content, description_text=None):
+    async def do_preview(msg_type, message_content, description_text=None, smart_embed=None):
+        """Send a preview into the current channel. Returns list of sent messages."""
         sent = []
+
+        def make_plain():
+            return discord.Embed(description=message_content, color=EMBED_COLOR)
+
+        main_embed = smart_embed if smart_embed else make_plain()
+
         if msg_type == 1:
-            e = discord.Embed(description=message_content, color=EMBED_COLOR)
-            sent.append(await ctx.send(embed=e))
+            sent.append(await ctx.send(embed=main_embed))
+
         elif msg_type == 2:
             try:
                 sent.append(await ctx.send(file=discord.File(BANNER_FILE)))
             except FileNotFoundError:
                 pass
             sent.append(await ctx.send(embed=discord.Embed(description=description_text, color=EMBED_COLOR)))
-            sent.append(await ctx.send(embed=discord.Embed(description=message_content, color=EMBED_COLOR)))
+            sent.append(await ctx.send(embed=main_embed))
+
         elif msg_type == 3:
-            e = discord.Embed(description=message_content, color=EMBED_COLOR)
-            e.set_image(url="attachment://banner.png")
+            if not smart_embed:
+                main_embed.set_image(url="attachment://banner.png")
             try:
-                sent.append(await ctx.send(embed=e, file=discord.File(BANNER_FILE, filename="banner.png")))
+                sent.append(await ctx.send(embed=main_embed, file=discord.File(BANNER_FILE, filename="banner.png")))
             except FileNotFoundError:
-                sent.append(await ctx.send(embed=e))
+                sent.append(await ctx.send(embed=main_embed))
+
         elif msg_type == 4:
             try:
                 sent.append(await ctx.send(file=discord.File(BANNER_FILE)))
             except FileNotFoundError:
                 pass
-            sent.append(await ctx.send(embed=discord.Embed(description=message_content, color=EMBED_COLOR)))
+            sent.append(await ctx.send(embed=main_embed))
+
         return sent
 
-    # STEP 1: Pick type
+    # ── STEP 1: Pick type ──
     type_desc = (
         "Which message type would you like to create?\n\n"
         "\u0031\ufe0f\u20e3 \u2014 Embed with message content only\n"
@@ -1118,8 +1279,8 @@ async def bm(ctx):
     )
     type_embed = discord.Embed(title="\U0001f4dd Bot Message Creator", description=type_desc, color=EMBED_COLOR)
     type_msg = await ctx.send(embed=type_embed)
-    for e in TYPE_EMOJIS:
-        await type_msg.add_reaction(e)
+    for em in TYPE_EMOJIS:
+        await type_msg.add_reaction(em)
 
     def type_check(reaction, user):
         return (
@@ -1147,9 +1308,9 @@ async def bm(ctx):
         color=EMBED_COLOR
     ))
 
-    # STEP 2: Collect content
+    # ── STEP 2: Collect content ──
     description_text = None
-    message_content = None
+    message_content  = None
 
     if msg_type == 2:
         desc_prompt = await ctx.send(embed=discord.Embed(
@@ -1195,7 +1356,85 @@ async def bm(ctx):
             pass
         await content_prompt.edit(embed=discord.Embed(description="\u2705 Message content saved.", color=EMBED_COLOR))
 
-    # STEP 3: Channel selection
+    # ── STEP 2b: Smart link detection ──
+    smart_embed = None
+    link_type, link_id = _detect_link(message_content)
+
+    if link_type:
+        # Extract the original URL from the content for the embed hyperlink
+        url_match = re.search(
+            r"https?://[^\s]+",
+            message_content,
+            re.IGNORECASE
+        )
+        original_url = url_match.group(0) if url_match else ""
+
+        type_labels = {
+            "roblox_game":    "\U0001f3ae Roblox Game",
+            "roblox_user":    "\U0001f464 Roblox User Profile",
+            "roblox_group":   "\U0001f465 Roblox Group",
+            "discord_invite": "\U0001f4e8 Discord Server Invite",
+        }
+        label = type_labels.get(link_type, "Link")
+
+        smart_detect_msg = await ctx.send(embed=discord.Embed(
+            title="\u2728 Smart Embed Detected!",
+            description=(
+                f"Found a **{label}** link.\n\n"
+                f"React \u2705 to auto-build a rich embed with live data from this link,\n"
+                f"or \u274c to use plain text instead."
+            ),
+            color=EMBED_COLOR
+        ))
+        await smart_detect_msg.add_reaction("\u2705")
+        await smart_detect_msg.add_reaction("\u274c")
+
+        def smart_check(reaction, user):
+            return (
+                user == ctx.author
+                and reaction.message.id == smart_detect_msg.id
+                and str(reaction.emoji) in ["\u2705", "\u274c"]
+            )
+        try:
+            smart_reaction, _ = await bot.wait_for("reaction_add", check=smart_check, timeout=60)
+        except asyncio.TimeoutError:
+            await smart_detect_msg.edit(embed=discord.Embed(
+                description="\u23f0 Timed out — using plain text.",
+                color=discord.Color.orange()
+            ))
+            smart_reaction = None
+
+        if smart_reaction and str(smart_reaction.emoji) == "\u2705":
+            building_msg = await smart_detect_msg.edit(embed=discord.Embed(
+                description=f"\u23f3 Fetching data for **{label}**...",
+                color=EMBED_COLOR
+            ))
+            try:
+                await smart_detect_msg.clear_reactions()
+            except Exception:
+                pass
+            smart_embed = await _build_smart_embed(link_type, link_id, original_url)
+            if smart_embed:
+                await smart_detect_msg.edit(embed=discord.Embed(
+                    description=f"\u2705 Smart embed built for **{label}**!",
+                    color=EMBED_COLOR
+                ))
+            else:
+                await smart_detect_msg.edit(embed=discord.Embed(
+                    description="\u26a0\ufe0f Could not fetch data \u2014 using plain text instead.",
+                    color=discord.Color.orange()
+                ))
+        else:
+            try:
+                await smart_detect_msg.clear_reactions()
+            except Exception:
+                pass
+            await smart_detect_msg.edit(embed=discord.Embed(
+                description="\u2705 Using plain text embed.",
+                color=EMBED_COLOR
+            ))
+
+    # ── STEP 3: Channel selection ──
     chan_desc = (
         "**Reply to this message** with the channel to send to.\n\n"
         "Type **#channel-name** to pick a channel, or **C** for the current channel."
@@ -1229,13 +1468,16 @@ async def bm(ctx):
         color=EMBED_COLOR
     ))
 
-    # STEP 4: Preview
+    # ── STEP 4: Preview ──
     preview_header = await ctx.send(embed=discord.Embed(
         title="\U0001f441\ufe0f This is the final draft of your message. Ready to send?",
-        description=f"**Sending to:** {target_channel.mention}\n\u200b\n*(This preview is only visible here \u2014 the message has not been sent yet.)*",
+        description=(
+            f"**Sending to:** {target_channel.mention}\n\u200b\n"
+            f"*(This preview is only visible here \u2014 the message has not been sent yet.)*"
+        ),
         color=EMBED_COLOR
     ))
-    preview_msgs = await do_preview(msg_type, message_content, description_text)
+    preview_msgs = await do_preview(msg_type, message_content, description_text, smart_embed)
 
     confirm_msg = await ctx.send(embed=discord.Embed(
         description="React with \u2705 to **send** or \u274c to **start over**.",
@@ -1296,8 +1538,8 @@ async def bm(ctx):
         await ctx.invoke(bot.get_command("bm"))
         return
 
-    # STEP 5: Send for real
-    await do_send(target_channel, msg_type, message_content, description_text)
+    # ── STEP 5: Send for real ──
+    await do_send(target_channel, msg_type, message_content, description_text, smart_embed)
     await ctx.send(
         embed=discord.Embed(
             description=f"\u2705 Message sent to {target_channel.mention}!",
@@ -1305,6 +1547,7 @@ async def bm(ctx):
         ),
         delete_after=10
     )
+
 
 
 # =========================
@@ -1351,6 +1594,7 @@ BB_CHANNEL_LIST = [
     ("game-links",       "{.Σ} ───── LINKS ─────",        "links"),
     ("my-profile",       "{.Σ} ───── LINKS ─────",        "links"),
     ("youtube-links",    "{.Σ} ───── LINKS ─────",        "links"),
+    ("server-partnerships", "{.Σ} ───── LINKS ─────",     "links"),
     ("general",          "{.Σ} ───── COMMUNITY ─────",    "community"),
     ("memes",            "{.Σ} ───── COMMUNITY ─────",    "community"),
     ("polls",            "{.Σ} ───── COMMUNITY ─────",    "community"),
