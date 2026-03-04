@@ -1105,7 +1105,7 @@ async def _build_smart_embed(link_type, identifier, original_url):
         if banner:
             e.set_image(url=banner)
         e.set_footer(text="Roblox Game")
-        return e
+        return e, None
 
     elif link_type == "roblox_user":
         user   = await fetch_roblox_user(identifier)
@@ -1122,7 +1122,7 @@ async def _build_smart_embed(link_type, identifier, original_url):
         if avatar:
             e.set_thumbnail(url=avatar)
         e.set_footer(text="Roblox Profile")
-        return e
+        return e, None
 
     elif link_type == "roblox_group":
         group = await fetch_roblox_group(identifier)
@@ -1139,36 +1139,82 @@ async def _build_smart_embed(link_type, identifier, original_url):
         if icon:
             e.set_thumbnail(url=icon)
         e.set_footer(text="Roblox Group")
-        return e
+        return e, None
 
     elif link_type == "discord_invite":
         data = await fetch_discord_invite(identifier)
         if not data:
-            return None
-        guild_data = data.get("guild", {})
-        name       = guild_data.get("name", "Unknown Server")
-        desc       = guild_data.get("description") or "No description available."
-        members    = data.get("approximate_member_count", 0)
-        online     = data.get("approximate_presence_count", 0)
-        icon_hash  = guild_data.get("icon")
-        guild_id   = guild_data.get("id")
-        icon_url   = f"https://cdn.discordapp.com/icons/{guild_id}/{icon_hash}.png" if icon_hash and guild_id else None
-        invite_url = f"https://discord.gg/{identifier}"
+            return None, None
+        guild_data   = data.get("guild", {})
+        guild_id     = guild_data.get("id")
+        name         = guild_data.get("name", "Unknown Server")
+        desc         = guild_data.get("description") or "No description available."
+        members      = data.get("approximate_member_count", 0)
+        online       = data.get("approximate_presence_count", 0)
+        invite_url   = f"https://discord.gg/{identifier}"
+
+        # Icons & banners
+        icon_hash    = guild_data.get("icon")
+        banner_hash  = guild_data.get("banner")
+        icon_url     = f"https://cdn.discordapp.com/icons/{guild_id}/{icon_hash}.png" if icon_hash and guild_id else None
+        banner_url   = f"https://cdn.discordapp.com/banners/{guild_id}/{banner_hash}.png?size=1024" if banner_hash and guild_id else None
+
+        # Boost tier
+        boost_tier   = guild_data.get("premium_tier", 0)
+        boost_count  = guild_data.get("premium_subscription_count", 0)
+        tier_label   = {0: "No Boost", 1: "Level 1", 2: "Level 2", 3: "Level 3"}.get(boost_tier, "Unknown")
+
+        # Verification level
+        verify_level = guild_data.get("verification_level", 0)
+        verify_label = {0: "None", 1: "Low", 2: "Medium", 3: "High", 4: "Highest"}.get(verify_level, "Unknown")
+
+        # Features badges
+        features     = guild_data.get("features", [])
+        badges = []
+        if "PARTNERED"  in features: badges.append("\U0001f91d Partnered")
+        if "VERIFIED"   in features: badges.append("\u2705 Verified")
+        if "COMMUNITY"  in features: badges.append("\U0001f465 Community")
+        if "DISCOVERABLE" in features: badges.append("\U0001f50d Discoverable")
+        features_str = " \u2022 ".join(badges) if badges else "None"
+
+        # Invite channel
+        channel_data = data.get("channel", {})
+        channel_name = channel_data.get("name", "Unknown")
 
         e = discord.Embed(
             title=f"\U0001f4e8 {name}",
-            description=desc,
+            description=f"{desc}\n\u200b",
             url=invite_url,
-            color=EMBED_COLOR
+            color=discord.Color.green()
         )
-        e.add_field(name="\U0001f465 Members", value=f"{members:,}", inline=True)
-        e.add_field(name="\U0001f7e2 Online",  value=f"{online:,}", inline=True)
+        # Row 1 — 3 inline fields
+        e.add_field(name="\U0001f465 Members",      value=f"{members:,}",  inline=True)
+        e.add_field(name="\U0001f7e2 Online",        value=f"{online:,}",   inline=True)
+        e.add_field(name="\U0001f680 Boost Tier",    value=f"{tier_label} ({boost_count} boosts)", inline=True)
+        # Row 2 — 3 inline fields
+        e.add_field(name="\U0001f6e1\ufe0f Verification", value=verify_label,   inline=True)
+        e.add_field(name="\U0001f4cc Invite Channel", value=f"#{channel_name}", inline=True)
+        e.add_field(name="\U0001f3f7\ufe0f Features",     value=features_str,   inline=True)
+        # Row 3 — invite link spanning full width
+        e.add_field(name="\U0001f517 Invite Link", value=f"[Click to join]({invite_url})", inline=False)
+
         if icon_url:
             e.set_thumbnail(url=icon_url)
+        if banner_url:
+            e.set_image(url=banner_url)
         e.set_footer(text="Discord Server")
-        return e
 
-    return None
+        # Green Join button
+        view = discord.ui.View()
+        view.add_item(discord.ui.Button(
+            label="Join Server",
+            style=discord.ButtonStyle.green,
+            url=invite_url,
+            emoji="\U0001f4e8"
+        ))
+        return e, view
+
+    return None, None
 
 
 # =========================
@@ -1195,16 +1241,16 @@ async def bm(ctx):
         except asyncio.TimeoutError:
             return None, None
 
-    async def do_send(channel, msg_type, message_content, description_text=None, smart_embed=None):
+    async def do_send(channel, msg_type, message_content, description_text=None, smart_embed=None, smart_view=None):
         """Send the final message to the target channel."""
-        # Determine the main embed to use
         def make_plain():
             return discord.Embed(description=message_content, color=EMBED_COLOR)
 
         main_embed = smart_embed if smart_embed else make_plain()
+        view       = smart_view  # only attached to the main embed message
 
         if msg_type == 1:
-            await channel.send(embed=main_embed)
+            await channel.send(embed=main_embed, view=view)
 
         elif msg_type == 2:
             try:
@@ -1212,26 +1258,24 @@ async def bm(ctx):
             except FileNotFoundError:
                 pass
             await channel.send(embed=discord.Embed(description=description_text, color=EMBED_COLOR))
-            await channel.send(embed=main_embed)
+            await channel.send(embed=main_embed, view=view)
 
         elif msg_type == 3:
-            # Banner inside the embed as image at bottom
-            # Only add set_image if smart_embed didn't already set one
             if not smart_embed:
                 main_embed.set_image(url="attachment://banner.png")
             try:
-                await channel.send(embed=main_embed, file=discord.File(BANNER_FILE, filename="banner.png"))
+                await channel.send(embed=main_embed, file=discord.File(BANNER_FILE, filename="banner.png"), view=view)
             except FileNotFoundError:
-                await channel.send(embed=main_embed)
+                await channel.send(embed=main_embed, view=view)
 
         elif msg_type == 4:
             try:
                 await channel.send(file=discord.File(BANNER_FILE))
             except FileNotFoundError:
                 pass
-            await channel.send(embed=main_embed)
+            await channel.send(embed=main_embed, view=view)
 
-    async def do_preview(msg_type, message_content, description_text=None, smart_embed=None):
+    async def do_preview(msg_type, message_content, description_text=None, smart_embed=None, smart_view=None):
         """Send a preview into the current channel. Returns list of sent messages."""
         sent = []
 
@@ -1239,9 +1283,10 @@ async def bm(ctx):
             return discord.Embed(description=message_content, color=EMBED_COLOR)
 
         main_embed = smart_embed if smart_embed else make_plain()
+        view       = smart_view
 
         if msg_type == 1:
-            sent.append(await ctx.send(embed=main_embed))
+            sent.append(await ctx.send(embed=main_embed, view=view))
 
         elif msg_type == 2:
             try:
@@ -1249,22 +1294,22 @@ async def bm(ctx):
             except FileNotFoundError:
                 pass
             sent.append(await ctx.send(embed=discord.Embed(description=description_text, color=EMBED_COLOR)))
-            sent.append(await ctx.send(embed=main_embed))
+            sent.append(await ctx.send(embed=main_embed, view=view))
 
         elif msg_type == 3:
             if not smart_embed:
                 main_embed.set_image(url="attachment://banner.png")
             try:
-                sent.append(await ctx.send(embed=main_embed, file=discord.File(BANNER_FILE, filename="banner.png")))
+                sent.append(await ctx.send(embed=main_embed, file=discord.File(BANNER_FILE, filename="banner.png"), view=view))
             except FileNotFoundError:
-                sent.append(await ctx.send(embed=main_embed))
+                sent.append(await ctx.send(embed=main_embed, view=view))
 
         elif msg_type == 4:
             try:
                 sent.append(await ctx.send(file=discord.File(BANNER_FILE)))
             except FileNotFoundError:
                 pass
-            sent.append(await ctx.send(embed=main_embed))
+            sent.append(await ctx.send(embed=main_embed, view=view))
 
         return sent
 
@@ -1358,6 +1403,7 @@ async def bm(ctx):
 
     # ── STEP 2b: Smart link detection ──
     smart_embed = None
+    smart_view  = None
     link_type, link_id = _detect_link(message_content)
 
     if link_type:
@@ -1413,7 +1459,7 @@ async def bm(ctx):
                 await smart_detect_msg.clear_reactions()
             except Exception:
                 pass
-            smart_embed = await _build_smart_embed(link_type, link_id, original_url)
+            smart_embed, smart_view = await _build_smart_embed(link_type, link_id, original_url)
             if smart_embed:
                 await smart_detect_msg.edit(embed=discord.Embed(
                     description=f"\u2705 Smart embed built for **{label}**!",
@@ -1477,7 +1523,7 @@ async def bm(ctx):
         ),
         color=EMBED_COLOR
     ))
-    preview_msgs = await do_preview(msg_type, message_content, description_text, smart_embed)
+    preview_msgs = await do_preview(msg_type, message_content, description_text, smart_embed, smart_view)
 
     confirm_msg = await ctx.send(embed=discord.Embed(
         description="React with \u2705 to **send** or \u274c to **start over**.",
@@ -1539,7 +1585,7 @@ async def bm(ctx):
         return
 
     # ── STEP 5: Send for real ──
-    await do_send(target_channel, msg_type, message_content, description_text, smart_embed)
+    await do_send(target_channel, msg_type, message_content, description_text, smart_embed, smart_view)
     await ctx.send(
         embed=discord.Embed(
             description=f"\u2705 Message sent to {target_channel.mention}!",
