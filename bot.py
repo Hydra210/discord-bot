@@ -1241,13 +1241,14 @@ async def bm(ctx):
         except asyncio.TimeoutError:
             return None, None
 
-    async def do_send(channel, msg_type, message_content, description_text=None, smart_embed=None, smart_view=None):
+    async def do_send(channel, msg_type, message_content, description_text=None, smart_embed=None, smart_view=None, chosen_color=None):
         """Send the final message to the target channel."""
+        c = chosen_color or EMBED_COLOR
         def make_plain():
-            return discord.Embed(description=message_content, color=EMBED_COLOR)
+            return discord.Embed(description=message_content, color=c)
 
         main_embed = smart_embed if smart_embed else make_plain()
-        view       = smart_view  # only attached to the main embed message
+        view       = smart_view
 
         if msg_type == 1:
             await channel.send(embed=main_embed, view=view)
@@ -1257,7 +1258,7 @@ async def bm(ctx):
                 await channel.send(file=discord.File(BANNER_FILE))
             except FileNotFoundError:
                 pass
-            await channel.send(embed=discord.Embed(description=description_text, color=EMBED_COLOR))
+            await channel.send(embed=discord.Embed(description=description_text, color=c))
             await channel.send(embed=main_embed, view=view)
 
         elif msg_type == 3:
@@ -1275,12 +1276,12 @@ async def bm(ctx):
                 pass
             await channel.send(embed=main_embed, view=view)
 
-    async def do_preview(msg_type, message_content, description_text=None, smart_embed=None, smart_view=None):
+    async def do_preview(msg_type, message_content, description_text=None, smart_embed=None, smart_view=None, chosen_color=None):
         """Send a preview into the current channel. Returns list of sent messages."""
         sent = []
-
+        c = chosen_color or EMBED_COLOR
         def make_plain():
-            return discord.Embed(description=message_content, color=EMBED_COLOR)
+            return discord.Embed(description=message_content, color=c)
 
         main_embed = smart_embed if smart_embed else make_plain()
         view       = smart_view
@@ -1293,7 +1294,7 @@ async def bm(ctx):
                 sent.append(await ctx.send(file=discord.File(BANNER_FILE)))
             except FileNotFoundError:
                 pass
-            sent.append(await ctx.send(embed=discord.Embed(description=description_text, color=EMBED_COLOR)))
+            sent.append(await ctx.send(embed=discord.Embed(description=description_text, color=c)))
             sent.append(await ctx.send(embed=main_embed, view=view))
 
         elif msg_type == 3:
@@ -1480,6 +1481,123 @@ async def bm(ctx):
                 color=EMBED_COLOR
             ))
 
+
+    # ── STEP 2c: Color picker ──
+    COLOR_PALETTE = [
+        ("\U0001f49c Server Purple",  discord.Color.from_rgb(80,  30,  120)),
+        ("\u2764\ufe0f Red",          discord.Color.from_rgb(231, 76,  60)),
+        ("\U0001f9e1 Orange",         discord.Color.from_rgb(230, 126, 34)),
+        ("\U0001f49b Yellow",         discord.Color.from_rgb(241, 196, 15)),
+        ("\U0001f49a Green",          discord.Color.from_rgb(46,  204, 113)),
+        ("\U0001f9a6 Teal",           discord.Color.from_rgb(26,  188, 156)),
+        ("\U0001f499 Blue",           discord.Color.from_rgb(52,  152, 219)),
+        ("\U0001f49c Purple",         discord.Color.from_rgb(155, 89,  182)),
+        ("\U0001f497 Pink",           discord.Color.from_rgb(255, 105, 180)),
+        ("\U0001f5a4 Dark",           discord.Color.from_rgb(44,  47,  51)),
+    ]
+    CP_EMOJIS = [
+        "\u0031\ufe0f\u20e3", "\u0032\ufe0f\u20e3", "\u0033\ufe0f\u20e3",
+        "\u0034\ufe0f\u20e3", "\u0035\ufe0f\u20e3", "\u0036\ufe0f\u20e3",
+        "\u0037\ufe0f\u20e3", "\u0038\ufe0f\u20e3", "\u0039\ufe0f\u20e3",
+        "\U0001f51f"
+    ]
+
+    palette_lines = [f"{CP_EMOJIS[i]}  {name}" for i, (name, _) in enumerate(COLOR_PALETTE)]
+    palette_desc  = "\n".join(palette_lines)
+    color_picker_embed = discord.Embed(
+        title="\U0001f3a8 Pick an Embed Color",
+        description=(
+            palette_desc
+            + "\n\n\u2015\u2015\u2015\u2015\u2015\u2015\u2015\u2015\u2015\u2015\u2015\u2015\u2015\u2015\u2015\n"
+            "React with a number to pick a preset, or **reply to this message** "
+            "with a hex code e.g. `#ff5733` for a custom color.\n"
+            "Times out in **60s** \u2014 defaults to Server Purple."
+        ),
+        color=EMBED_COLOR
+    )
+    color_msg2 = await ctx.send(embed=color_picker_embed)
+    for em in CP_EMOJIS:
+        await color_msg2.add_reaction(em)
+
+    chosen_color = EMBED_COLOR
+
+    def cp_rxn_check(reaction, user):
+        return (
+            user == ctx.author
+            and reaction.message.id == color_msg2.id
+            and str(reaction.emoji) in CP_EMOJIS
+        )
+
+    def cp_msg_check(m):
+        return (
+            m.author == ctx.author
+            and m.channel == ctx.channel
+            and m.reference is not None
+            and m.reference.message_id == color_msg2.id
+        )
+
+    try:
+        done, pending = await asyncio.wait(
+            [
+                asyncio.ensure_future(bot.wait_for("reaction_add", check=cp_rxn_check, timeout=60)),
+                asyncio.ensure_future(bot.wait_for("message",      check=cp_msg_check, timeout=60)),
+            ],
+            return_when=asyncio.FIRST_COMPLETED
+        )
+        for f in pending:
+            f.cancel()
+        cp_result = done.pop().result()
+
+        if isinstance(cp_result, tuple):
+            cp_rxn, _ = cp_result
+            idx = CP_EMOJIS.index(str(cp_rxn.emoji))
+            color_name, chosen_color = COLOR_PALETTE[idx]
+            try:
+                await color_msg2.clear_reactions()
+            except Exception:
+                pass
+            await color_msg2.edit(embed=discord.Embed(
+                description=f"\u2705 Color set to **{color_name}**.",
+                color=chosen_color
+            ))
+        else:
+            hex_raw = cp_result.content.strip().lstrip("#")
+            try:
+                r = int(hex_raw[0:2], 16)
+                g = int(hex_raw[2:4], 16)
+                b = int(hex_raw[4:6], 16)
+                chosen_color = discord.Color.from_rgb(r, g, b)
+                color_label  = f"#{hex_raw.upper()[:6]}"
+            except Exception:
+                chosen_color = EMBED_COLOR
+                color_label  = "Server Purple (invalid hex)"
+            try:
+                await cp_result.delete()
+            except Exception:
+                pass
+            try:
+                await color_msg2.clear_reactions()
+            except Exception:
+                pass
+            await color_msg2.edit(embed=discord.Embed(
+                description=f"\u2705 Color set to **{color_label}**.",
+                color=chosen_color
+            ))
+
+    except asyncio.TimeoutError:
+        try:
+            await color_msg2.clear_reactions()
+        except Exception:
+            pass
+        await color_msg2.edit(embed=discord.Embed(
+            description="\u23f0 Timed out \u2014 using Server Purple.",
+            color=EMBED_COLOR
+        ))
+
+    if smart_embed:
+        smart_embed.color = chosen_color
+
+
     # ── STEP 3: Channel selection ──
     chan_desc = (
         "**Reply to this message** with the channel to send to.\n\n"
@@ -1523,7 +1641,7 @@ async def bm(ctx):
         ),
         color=EMBED_COLOR
     ))
-    preview_msgs = await do_preview(msg_type, message_content, description_text, smart_embed, smart_view)
+    preview_msgs = await do_preview(msg_type, message_content, description_text, smart_embed, smart_view, chosen_color)
 
     confirm_msg = await ctx.send(embed=discord.Embed(
         description="React with \u2705 to **send** or \u274c to **start over**.",
@@ -1585,7 +1703,7 @@ async def bm(ctx):
         return
 
     # ── STEP 5: Send for real ──
-    await do_send(target_channel, msg_type, message_content, description_text, smart_embed, smart_view)
+    await do_send(target_channel, msg_type, message_content, description_text, smart_embed, smart_view, chosen_color)
     await ctx.send(
         embed=discord.Embed(
             description=f"\u2705 Message sent to {target_channel.mention}!",
