@@ -1,4 +1,5 @@
 import discord
+from discord import app_commands
 from discord.ext import commands
 from flask import Flask
 from threading import Thread
@@ -2191,6 +2192,8 @@ async def _wait_for_slash_reply(user_id: int, timeout: float = 120):
 
 
 @bot.tree.command(name="r", description="Reply to the bot's last prompt (use when bot asks you to type something)")
+@app_commands.allowed_installs(guilds=True, users=True)
+@app_commands.allowed_contexts(guilds=True, dms=True, private_channels=True)
 async def slash_r(interaction: discord.Interaction, message: str):
     future = _slash_reply_waiting.get(interaction.user.id)
     if future and not future.done():
@@ -2212,7 +2215,7 @@ class CCView(discord.ui.View):
     def __init__(self, interaction: discord.Interaction):
         super().__init__(timeout=180)
         self.interaction = interaction
-        self.channel     = interaction.channel
+        self.channel     = interaction.channel or interaction.user.dm_channel
 
     async def _prompt_and_get(self, interaction: discord.Interaction, prompt_text: str):
         """Tell the user to use /r, then wait for their reply via the slash reply system."""
@@ -2239,11 +2242,20 @@ class CCView(discord.ui.View):
                 if msg.author.id == interaction.user.id and check_fn(msg):
                     collected.append(msg)
         except discord.Forbidden:
-            await interaction.edit_original_response(
-                content="\u274c Missing permission to read history here. "
-                        "Make sure the bot has **Read Message History** in this channel.",
-                view=None
-            )
+            is_dm = isinstance(self.channel, (discord.DMChannel, discord.PartialMessageable))
+            if is_dm:
+                await interaction.edit_original_response(
+                    content="\u274c In private DMs between users, Discord only allows the bot to "
+                            "delete messages **it sent itself** \u2014 not your personal messages. "
+                            "This works in **server channels** and in your **DM with the bot**.",
+                    view=None
+                )
+            else:
+                await interaction.edit_original_response(
+                    content="\u274c Missing **Read Message History** permission. "
+                            "Ask a server admin to grant it to the bot.",
+                    view=None
+                )
             return
 
         if not collected:
@@ -2470,7 +2482,7 @@ class CFView(discord.ui.View):
     def __init__(self, interaction: discord.Interaction):
         super().__init__(timeout=180)
         self.interaction = interaction
-        self.channel     = interaction.channel
+        self.channel     = interaction.channel or interaction.user.dm_channel
 
     async def _prompt_and_get(self, interaction: discord.Interaction, prompt_text: str):
         await interaction.edit_original_response(
@@ -2494,9 +2506,19 @@ class CFView(discord.ui.View):
                 if msg.author.id == interaction.user.id and check_fn(msg):
                     results.append(msg)
         except discord.Forbidden:
-            await interaction.edit_original_response(
-                content="\u274c Missing permission to read history here.", view=None
-            )
+            is_dm = isinstance(self.channel, (discord.DMChannel, discord.PartialMessageable))
+            if is_dm:
+                await interaction.edit_original_response(
+                    content="\u274c In private DMs between users, the bot can only see messages in "
+                            "channels it has access to. Try using this in a **server channel** or "
+                            "in your **DM with the bot** directly.",
+                    view=None
+                )
+            else:
+                await interaction.edit_original_response(
+                    content="\u274c Missing **Read Message History** permission in this channel.",
+                    view=None
+                )
             return
 
         if not results:
