@@ -6,6 +6,7 @@ import os
 import asyncio
 import aiohttp
 import re
+from datetime import datetime
 
 # =========================
 # TOKEN FROM RENDER ENV
@@ -370,6 +371,11 @@ async def on_ready():
     print("Bot is online.")
     print(f"Guilds: {[g.name for g in bot.guilds]}")
     print(f"Member intent enabled: {bot.intents.members}")
+    try:
+        synced = await bot.tree.sync()
+        print(f"Synced {len(synced)} slash command(s) globally.")
+    except Exception as e:
+        print(f"Failed to sync slash commands: {e}")
 
 # =========================
 # MEMBER JOIN
@@ -2160,6 +2166,402 @@ async def bb(ctx):
 
             # Refresh the panel embed
             await panel.edit(embed=bb_build_embed(page, built_names, total_missing))
+
+
+# =========================
+# /CC — CLEAN CHAT (mass delete own messages)
+# =========================
+
+class CCView(discord.ui.View):
+    def __init__(self, interaction: discord.Interaction):
+        super().__init__(timeout=120)
+        self.interaction = interaction
+        self.channel = interaction.channel
+
+    async def _status(self, content):
+        try:
+            await self.interaction.edit_original_response(content=content, view=self, embed=None)
+        except Exception:
+            pass
+
+    async def _collect_reply(self, prompt_text, followup=True):
+        """Send a followup prompt and wait for the user to reply to it."""
+        prompt_msg = await self.interaction.followup.send(prompt_text, ephemeral=True)
+
+        def check(m):
+            return (
+                m.author.id == self.interaction.user.id
+                and m.channel == self.channel
+                and m.reference is not None
+                and m.reference.message_id == prompt_msg.id
+            )
+        try:
+            reply = await bot.wait_for("message", check=check, timeout=120)
+            return reply.content.strip(), reply
+        except asyncio.TimeoutError:
+            return None, None
+
+    async def _do_delete(self, check_fn, label):
+        """Collect matching messages then delete them."""
+        await self.interaction.edit_original_response(
+            content=f"\U0001f50d Scanning messages for: **{label}**...",
+            view=None, embed=None
+        )
+        collected = []
+        is_dm = isinstance(self.channel, discord.DMChannel)
+
+        try:
+            async for msg in self.channel.history(limit=None):
+                if msg.author.id == self.interaction.user.id and check_fn(msg):
+                    collected.append(msg)
+        except discord.Forbidden:
+            await self.interaction.edit_original_response(
+                content="\u274c I don\u2019t have permission to read message history here.", view=None
+            )
+            return
+
+        if not collected:
+            await self.interaction.edit_original_response(
+                content=f"\u2139\ufe0f No messages found matching: **{label}**.", view=None
+            )
+            return
+
+        await self.interaction.edit_original_response(
+            content=f"\U0001f5d1\ufe0f Deleting **{len(collected)}** message(s)...", view=None
+        )
+
+        deleted = 0
+        failed  = 0
+        for msg in collected:
+            try:
+                await msg.delete()
+                deleted += 1
+                await asyncio.sleep(0.75)   # respect rate limits, especially in DMs
+            except Exception:
+                failed += 1
+
+        result = f"\u2705 Deleted **{deleted}** message(s)"
+        if failed:
+            result += f" ({failed} failed \u2014 may be too old or already gone)"
+        result += f" matching: **{label}**."
+        await self.interaction.edit_original_response(content=result, view=None)
+
+    # ── Button: All my messages ──
+    @discord.ui.button(label="\U0001f5d1\ufe0f  All My Messages", style=discord.ButtonStyle.red, row=0)
+    async def btn_all(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.defer()
+        await self._do_delete(lambda m: True, "all your messages")
+
+    # ── Button: By keyword ──
+    @discord.ui.button(label="\U0001f50d  By Keyword", style=discord.ButtonStyle.primary, row=0)
+    async def btn_keyword(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.defer()
+        prompt = await interaction.followup.send(
+            "\U0001f4dd **Reply to this message** with the keyword(s) to delete (comma-separated for multiple).",
+            ephemeral=True
+        )
+        def check(m):
+            return (
+                m.author.id == interaction.user.id
+                and m.channel == self.channel
+                and m.reference is not None
+                and m.reference.message_id == prompt.id
+            )
+        try:
+            reply = await bot.wait_for("message", check=check, timeout=120)
+        except asyncio.TimeoutError:
+            await interaction.edit_original_response(content="\u23f0 Timed out.", view=None)
+            return
+        keywords = [k.strip().lower() for k in reply.content.split(",") if k.strip()]
+        try:
+            await reply.delete()
+        except Exception:
+            pass
+        await self._do_delete(
+            lambda m: any(kw in m.content.lower() for kw in keywords),
+            f"keywords: {', '.join(keywords)}"
+        )
+
+    # ── Button: By number sequences ──
+    @discord.ui.button(label="\U0001f522  Number Sequences", style=discord.ButtonStyle.primary, row=0)
+    async def btn_numbers(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.defer()
+        NUM_RE = re.compile(r'\d{4,}')
+        await self._do_delete(
+            lambda m: bool(NUM_RE.search(m.content)),
+            "messages containing number sequences (4+ digits)"
+        )
+
+    # ── Button: Before date ──
+    @discord.ui.button(label="\U0001f4c5  Before Date", style=discord.ButtonStyle.secondary, row=1)
+    async def btn_before(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.defer()
+        prompt = await interaction.followup.send(
+            "\U0001f4c5 **Reply to this message** with a date (YYYY-MM-DD or MM/DD/YYYY). "
+            "Messages **before** that date will be deleted.",
+            ephemeral=True
+        )
+        def check(m):
+            return (
+                m.author.id == interaction.user.id
+                and m.channel == self.channel
+                and m.reference is not None
+                and m.reference.message_id == prompt.id
+            )
+        try:
+            reply = await bot.wait_for("message", check=check, timeout=120)
+        except asyncio.TimeoutError:
+            await interaction.edit_original_response(content="\u23f0 Timed out.", view=None)
+            return
+        cutoff = _parse_date(reply.content.strip())
+        try:
+            await reply.delete()
+        except Exception:
+            pass
+        if not cutoff:
+            await interaction.edit_original_response(
+                content="\u274c Invalid date. Use YYYY-MM-DD or MM/DD/YYYY.", view=None
+            )
+            return
+        await self._do_delete(
+            lambda m: m.created_at.replace(tzinfo=None) < cutoff,
+            f"messages before {cutoff.date()}"
+        )
+
+    # ── Button: After date ──
+    @discord.ui.button(label="\U0001f4c5  After Date", style=discord.ButtonStyle.secondary, row=1)
+    async def btn_after(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.defer()
+        prompt = await interaction.followup.send(
+            "\U0001f4c5 **Reply to this message** with a date (YYYY-MM-DD or MM/DD/YYYY). "
+            "Messages **after** that date will be deleted.",
+            ephemeral=True
+        )
+        def check(m):
+            return (
+                m.author.id == interaction.user.id
+                and m.channel == self.channel
+                and m.reference is not None
+                and m.reference.message_id == prompt.id
+            )
+        try:
+            reply = await bot.wait_for("message", check=check, timeout=120)
+        except asyncio.TimeoutError:
+            await interaction.edit_original_response(content="\u23f0 Timed out.", view=None)
+            return
+        cutoff = _parse_date(reply.content.strip())
+        try:
+            await reply.delete()
+        except Exception:
+            pass
+        if not cutoff:
+            await interaction.edit_original_response(
+                content="\u274c Invalid date. Use YYYY-MM-DD or MM/DD/YYYY.", view=None
+            )
+            return
+        await self._do_delete(
+            lambda m: m.created_at.replace(tzinfo=None) > cutoff,
+            f"messages after {cutoff.date()}"
+        )
+
+    # ── Button: On specific date ──
+    @discord.ui.button(label="\U0001f4c5  On Date", style=discord.ButtonStyle.secondary, row=1)
+    async def btn_on(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.defer()
+        prompt = await interaction.followup.send(
+            "\U0001f4c5 **Reply to this message** with a date (YYYY-MM-DD or MM/DD/YYYY). "
+            "Messages sent **on** that date will be deleted.",
+            ephemeral=True
+        )
+        def check(m):
+            return (
+                m.author.id == interaction.user.id
+                and m.channel == self.channel
+                and m.reference is not None
+                and m.reference.message_id == prompt.id
+            )
+        try:
+            reply = await bot.wait_for("message", check=check, timeout=120)
+        except asyncio.TimeoutError:
+            await interaction.edit_original_response(content="\u23f0 Timed out.", view=None)
+            return
+        target = _parse_date(reply.content.strip())
+        try:
+            await reply.delete()
+        except Exception:
+            pass
+        if not target:
+            await interaction.edit_original_response(
+                content="\u274c Invalid date. Use YYYY-MM-DD or MM/DD/YYYY.", view=None
+            )
+            return
+        await self._do_delete(
+            lambda m: m.created_at.replace(tzinfo=None).date() == target.date(),
+            f"messages on {target.date()}"
+        )
+
+    async def on_timeout(self):
+        try:
+            await self.interaction.edit_original_response(
+                content="\u23f0 Panel timed out.", view=None
+            )
+        except Exception:
+            pass
+
+
+def _parse_date(text):
+    """Parse YYYY-MM-DD or MM/DD/YYYY into a naive datetime. Returns None on failure."""
+    from datetime import datetime
+    for fmt in ("%Y-%m-%d", "%m/%d/%Y", "%m-%d-%Y"):
+        try:
+            return datetime.strptime(text, fmt)
+        except ValueError:
+            continue
+    return None
+
+
+@bot.tree.command(name="cc", description="Clean Chat \u2014 interactively delete your own messages")
+async def cc(interaction: discord.Interaction):
+    embed = discord.Embed(
+        title="\U0001f9f9 Clean Chat",
+        description=(
+            "Choose what to delete from this channel.\n"
+            "Only **your own messages** will be affected.\n\n"
+            "\U0001f5d1\ufe0f **All My Messages** \u2014 delete everything you sent\n"
+            "\U0001f50d **By Keyword** \u2014 delete messages containing specific words\n"
+            "\U0001f522 **Number Sequences** \u2014 delete messages with long number strings\n"
+            "\U0001f4c5 **Before / After / On Date** \u2014 delete by date range\n\n"
+            "*This panel is only visible to you.*"
+        ),
+        color=discord.Color.from_rgb(80, 30, 120)
+    )
+    view = CCView(interaction)
+    await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+
+
+# =========================
+# /CF — CHAT FINDER (find messages, no deletion)
+# =========================
+
+class CFView(discord.ui.View):
+    def __init__(self, interaction: discord.Interaction):
+        super().__init__(timeout=120)
+        self.interaction = interaction
+        self.channel = interaction.channel
+
+    async def _do_find(self, check_fn, label):
+        await self.interaction.edit_original_response(
+            content=f"\U0001f50d Scanning for: **{label}**...",
+            view=None, embed=None
+        )
+        results = []
+        try:
+            async for msg in self.channel.history(limit=None):
+                if msg.author.id == self.interaction.user.id and check_fn(msg):
+                    results.append(msg)
+        except discord.Forbidden:
+            await self.interaction.edit_original_response(
+                content="\u274c I don\u2019t have permission to read message history here.", view=None
+            )
+            return
+
+        if not results:
+            await self.interaction.edit_original_response(
+                content=f"\u2139\ufe0f No messages found matching: **{label}**.", view=None
+            )
+            return
+
+        # Build result chunks (Discord 2000 char limit)
+        lines = []
+        for msg in results[:50]:  # cap at 50 results shown
+            ts = msg.created_at.strftime("%Y-%m-%d %H:%M")
+            content_preview = msg.content[:80].replace("\n", " ")
+            lines.append(f"`{ts}` \u2014 {content_preview}")
+
+        header = f"\U0001f4cb Found **{len(results)}** message(s) matching **{label}**"
+        if len(results) > 50:
+            header += f" (showing first 50)"
+        header += ":\n\n"
+
+        # Split into chunks under 1900 chars
+        chunks = []
+        current = header
+        for line in lines:
+            if len(current) + len(line) + 1 > 1900:
+                chunks.append(current)
+                current = ""
+            current += line + "\n"
+        if current:
+            chunks.append(current)
+
+        await self.interaction.edit_original_response(content=chunks[0], view=None)
+        for chunk in chunks[1:]:
+            await self.interaction.followup.send(chunk, ephemeral=True)
+
+    # ── Button: By keyword ──
+    @discord.ui.button(label="\U0001f50d  Find by Keyword", style=discord.ButtonStyle.primary, row=0)
+    async def btn_keyword(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.defer()
+        prompt = await interaction.followup.send(
+            "\U0001f4dd **Reply to this message** with the keyword(s) to search for (comma-separated for multiple).",
+            ephemeral=True
+        )
+        def check(m):
+            return (
+                m.author.id == interaction.user.id
+                and m.channel == self.channel
+                and m.reference is not None
+                and m.reference.message_id == prompt.id
+            )
+        try:
+            reply = await bot.wait_for("message", check=check, timeout=120)
+        except asyncio.TimeoutError:
+            await interaction.edit_original_response(content="\u23f0 Timed out.", view=None)
+            return
+        keywords = [k.strip().lower() for k in reply.content.split(",") if k.strip()]
+        try:
+            await reply.delete()
+        except Exception:
+            pass
+        await self._do_find(
+            lambda m: any(kw in m.content.lower() for kw in keywords),
+            f"keywords: {', '.join(keywords)}"
+        )
+
+    # ── Button: Number sequences ──
+    @discord.ui.button(label="\U0001f522  Find Number Sequences", style=discord.ButtonStyle.primary, row=0)
+    async def btn_numbers(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.defer()
+        NUM_RE = re.compile(r'\d{4,}')
+        await self._do_find(
+            lambda m: bool(NUM_RE.search(m.content)),
+            "messages containing number sequences (4+ digits)"
+        )
+
+    async def on_timeout(self):
+        try:
+            await self.interaction.edit_original_response(
+                content="\u23f0 Panel timed out.", view=None
+            )
+        except Exception:
+            pass
+
+
+@bot.tree.command(name="cf", description="Chat Finder \u2014 search your messages by keyword or number pattern")
+async def cf(interaction: discord.Interaction):
+    embed = discord.Embed(
+        title="\U0001f50e Chat Finder",
+        description=(
+            "Search through **your messages** in this channel.\n\n"
+            "\U0001f50d **Find by Keyword** \u2014 find messages containing specific words\n"
+            "\U0001f522 **Find Number Sequences** \u2014 find messages with long number strings\n\n"
+            "*Results are only visible to you. No messages will be deleted.*"
+        ),
+        color=discord.Color.from_rgb(80, 30, 120)
+    )
+    view = CFView(interaction)
+    await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+
 
 # =========================
 # START
