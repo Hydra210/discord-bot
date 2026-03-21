@@ -2455,6 +2455,8 @@ def _parse_date(text):
 
 
 @bot.tree.command(name="cc", description="Clean Chat \u2014 delete your own messages with filters")
+@app_commands.allowed_installs(guilds=True, users=True)
+@app_commands.allowed_contexts(guilds=True, dms=True, private_channels=True)
 async def cc(interaction: discord.Interaction):
     embed = discord.Embed(
         title="\U0001f9f9 Clean Chat",
@@ -2587,6 +2589,8 @@ class CFView(discord.ui.View):
 
 
 @bot.tree.command(name="cf", description="Chat Finder \u2014 search your messages by keyword or number pattern")
+@app_commands.allowed_installs(guilds=True, users=True)
+@app_commands.allowed_contexts(guilds=True, dms=True, private_channels=True)
 async def cf(interaction: discord.Interaction):
     embed = discord.Embed(
         title="\U0001f50e Chat Finder",
